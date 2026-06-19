@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.example.family.callcenter</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/absolute/path/to/family-call-center-public/.venv/bin/python</string>
+        <string>/absolute/path/to/family-call-center-public/run.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/absolute/path/to/family-call-center-public</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/absolute/path/to/family-call-center-public/logs/ivr.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/absolute/path/to/family-call-center-public/logs/ivr.log</string>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Throttle restarts: wait 10 seconds before restarting on crash -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>
