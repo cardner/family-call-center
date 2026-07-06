@@ -1,0 +1,19 @@
+services:
+  family-call-center:
+    image: ${IMAGE:-ghcr.io/your-org/family-call-center:latest}
+    container_name: family-call-center
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/data
+    networks:
+      - npm_network
+    # No host ports published — NPM reaches the container by name on the shared
+    # network (http://family-call-center:8080).
+
+networks:
+  npm_network:
+    external: true
+    # Set this to your existing Nginx Proxy Manager network. Discover it with
+    # `docker network ls` (commonly npm_default or nginx-proxy-manager_default).
+    name: ${NPM_NETWORK:-npm_default}

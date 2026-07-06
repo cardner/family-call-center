@@ -6,3 +6,13 @@ __pycache__/
 logs/
 data/recordings/
 data/ivr.db
+
+# Node / Basecoat vendoring
+node_modules/
+app/static/vendor/
+app/templates/components/basecoat/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

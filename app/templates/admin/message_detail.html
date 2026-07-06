@@ -1,0 +1,34 @@
+{% extends "admin/base.html" %}
+{% block title %}Message{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Message #{{ recording['id'] }}</h2>
+  <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages') }}">← Back</a>
+</div>
+
+<div class="card stack">
+  <div>
+    <span class="label">From</span>
+    <div>{{ recording['caller_id'] or 'unknown' }}</div>
+  </div>
+  <div class="row">
+    <div><span class="label">Received</span><div>{{ recording['created_at'] }}</div></div>
+    <div><span class="label">Duration</span><div>{{ recording['duration'] }}s</div></div>
+    <div><span class="label">Size</span><div>{{ (recording['file_size'] or 0) // 1024 }} KB</div></div>
+  </div>
+  <div>
+    <span class="label">Playback</span>
+    <audio controls preload="none" src="{{ url_for('admin.message_audio', message_id=recording['id']) }}" style="width:100%;">
+      Your browser does not support the audio element.
+    </audio>
+  </div>
+  <div>
+    <form method="post" action="{{ url_for('admin.message_delete', message_id=recording['id']) }}"
+          onsubmit="return confirm('Permanently delete this message and its audio file?');">
+      {{ delete_form.csrf_token }}
+      <button type="submit" class="btn btn-danger">Delete message</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

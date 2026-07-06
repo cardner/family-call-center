@@ -1,0 +1,9 @@
+# Local build override. Use alongside the base compose file to build the image
+# locally instead of pulling from a registry:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+services:
+  family-call-center:
+    build: .
+    image: family-call-center:local

@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+{% block title %}Messages{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Messages</h2>
+  <span class="muted">{{ total }} total</span>
+</div>
+
+<form method="get" action="{{ url_for('admin.messages') }}" class="row" style="margin-bottom:1rem;" data-trim>
+  <input class="input" name="q" type="text" maxlength="32" placeholder="Filter by caller ID"
+         value="{{ query }}" style="max-width:280px;" />
+  <button class="btn btn-outline" type="submit">Search</button>
+</form>
+
+<div class="card">
+  {% if recordings %}
+  <table>
+    <thead><tr><th>From</th><th>Received</th><th>Duration</th><th>Size</th><th></th></tr></thead>
+    <tbody>
+      {% for r in recordings %}
+      <tr>
+        <td>{{ r['caller_id'] or 'unknown' }}</td>
+        <td>{{ r['created_at'] }}</td>
+        <td>{{ r['duration'] }}s</td>
+        <td>{{ (r['file_size'] or 0) // 1024 }} KB</td>
+        <td><a class="btn btn-outline btn-sm" href="{{ url_for('admin.message_detail', message_id=r['id']) }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No messages found.</p>
+  {% endif %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="row" style="margin-top:1rem; align-items:center;">
+  {% if page > 1 %}
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page-1, per_page=per_page, q=query or None) }}">Previous</a>
+  {% endif %}
+  <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page+1, per_page=per_page, q=query or None) }}">Next</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "admin/base.html" %}
+{% block title %}Connection{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Connection diagnostics</h2>
+  <form method="post" action="{{ url_for('admin.connection_test') }}">
+    {{ form.csrf_token }}
+    <button type="submit" class="btn">Run tests</button>
+  </form>
+</div>
+
+<p class="muted" style="margin-top:0;">Verifies the path between Twilio and this app without placing a call.</p>
+
+{% if results %}
+<div class="card" style="margin-bottom:1.5rem;">
+  <h3>Results
+    <span class="badge badge-{{ results.overall }}" style="margin-left:0.5rem;">{{ results.overall | upper }}</span>
+  </h3>
+  <table>
+    <thead><tr><th>Check</th><th>Status</th><th>Details</th></tr></thead>
+    <tbody>
+      {% for check in results.checks %}
+      <tr>
+        <td>{{ check.name }}</td>
+        <td><span class="badge badge-{{ check.status }}">{{ check.status | upper }}</span></td>
+        <td>
+          {{ check.message }}
+          {% if check.detail %}<div class="muted" style="font-size:0.8rem;">{{ check.detail }}</div>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Twilio webhook URLs</h3>
+  <p class="muted" style="margin-top:0;">Set the voice webhook (POST) in your Twilio phone number configuration.</p>
+  {% for label, url in webhook_urls.items() %}
+  <div class="code-block">
+    <code data-copy="{{ url }}">{{ url }}</code>
+    <button type="button" class="btn btn-outline btn-sm" data-copy-btn>Copy</button>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3>Manual step</h3>
+  <p style="margin:0;">Place a test call to <strong>{{ phone_number }}</strong>, then check the
+    <a href="{{ url_for('admin.messages') }}">messages inbox</a> for the recording.</p>
+</div>
+{% endblock %}

@@ -1,6 +1,8 @@
 import logging
 import os
+import re
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import requests as http_requests
 from flask import Blueprint, request
@@ -8,14 +10,31 @@ from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse
 
 from app.utils.db import init_db, log_recording
+from app.utils.settings import get_max_recording_seconds, get_setting
 from app.utils.twilio_validator import validate_twilio_request
 from app.utils.twiml import error_response, twiml_response
+from app.utils.validation import parse_positive_int, sanitize_text
 from config import Config
 
 logger = logging.getLogger(__name__)
 voicemail_bp = Blueprint("voicemail", __name__)
 
 init_db()
+
+# Twilio recording SIDs look like RE followed by 32 hex chars.
+_RECORDING_SID_RE = re.compile(r"^RE[0-9a-fA-F]{32}$")
+
+
+def _is_twilio_recording_url(url):
+    """Only allow downloads from Twilio-owned HTTPS hosts."""
+    try:
+        parsed = urlparse(url)
+    except (ValueError, TypeError):
+        return False
+    if parsed.scheme != "https":
+        return False
+    host = parsed.hostname or ""
+    return host == "twilio.com" or host.endswith(".twilio.com")
 
 
 @voicemail_bp.post("/voicemail")
@@ -24,16 +43,13 @@ def voicemail():
     """Prompt the caller to leave a message and start recording."""
     try:
         vr = VoiceResponse()
-        vr.say(
-            "Please leave your voicemail after the beep. "
-            "Press pound when you are finished."
-        )
+        vr.say(get_setting("voicemail_prompt"))
         vr.record(
             action=f"{Config.BASE_URL}/voicemail/done",
             recording_status_callback=f"{Config.BASE_URL}/voicemail/callback",
             recording_status_callback_method="POST",
             finish_on_key="#",
-            max_length=300,
+            max_length=get_max_recording_seconds(),
             play_beep=True,
         )
         return twiml_response(vr)
@@ -48,7 +64,7 @@ def voicemail_done():
     """Thank the caller and end the call after recording."""
     try:
         vr = VoiceResponse()
-        vr.say("Thank you. Your message has been saved. Goodbye.")
+        vr.say(get_setting("voicemail_thanks"))
         vr.hangup()
         return twiml_response(vr)
     except Exception:
@@ -62,13 +78,31 @@ def voicemail_callback():
     """
     Called by Twilio when a recording is complete.
     Downloads the audio, saves it locally, logs metadata, then deletes from Twilio.
-    """
-    try:
-        recording_sid = request.form.get("RecordingSid", "")
-        recording_url = request.form.get("RecordingUrl", "")
-        duration = request.form.get("RecordingDuration", 0)
-        caller_id = request.form.get("From", "unknown")
 
+    Even though the request signature is verified, every field is still treated
+    as untrusted and validated before use.
+    """
+    recording_sid = request.form.get("RecordingSid", "")
+    recording_url = request.form.get("RecordingUrl", "")
+    caller_id = sanitize_text(request.form.get("From", "unknown"), max_length=32)
+    duration = parse_positive_int(
+        request.form.get("RecordingDuration", "0"),
+        min_value=0,
+        max_value=600,
+        default=None,
+    )
+
+    if not _RECORDING_SID_RE.match(recording_sid):
+        logger.warning("Rejected callback: invalid RecordingSid %r", recording_sid)
+        return ("", 400)
+    if not _is_twilio_recording_url(recording_url):
+        logger.warning("Rejected callback: non-Twilio RecordingUrl %r", recording_url)
+        return ("", 400)
+    if duration is None:
+        logger.warning("Rejected callback: invalid RecordingDuration")
+        return ("", 400)
+
+    try:
         logger.info(
             "Recording complete: sid=%s duration=%s from=%s",
             recording_sid,
@@ -103,7 +137,7 @@ def voicemail_callback():
         log_recording(
             created_at=now.isoformat(),
             caller_id=caller_id,
-            duration=int(duration),
+            duration=duration,
             filename=os.path.join(date_path, filename),
             file_size=file_size,
             twilio_sid=recording_sid,
@@ -114,9 +148,7 @@ def voicemail_callback():
 
         return ("", 204)
     except Exception:
-        logger.exception(
-            "Error in /voicemail/callback for sid=%s", request.form.get("RecordingSid")
-        )
+        logger.exception("Error in /voicemail/callback for sid=%s", recording_sid)
         return ("", 500)
 
 

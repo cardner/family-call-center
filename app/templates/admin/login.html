@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+{% block title %}Sign in{% endblock %}
+
+{% block auth_content %}
+<div style="max-width: 380px; margin: 4rem auto 0;">
+  <div class="card">
+    <h3>Sign in</h3>
+    <p class="muted" style="margin-top:0;">Family Call Center admin</p>
+    <form method="post" action="{{ url_for('admin.login') }}" data-trim>
+      {{ form.csrf_token }}
+      {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}" />{% endif %}
+      <div class="field">
+        <label class="label" for="username">Username</label>
+        <input class="input" id="username" name="username" type="text" maxlength="64"
+               autocomplete="username" required value="{{ form.username.data or '' }}" />
+        {% for error in form.username.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="field">
+        <label class="label" for="password">Password</label>
+        <input class="input" id="password" name="password" type="password" maxlength="128"
+               autocomplete="current-password" required />
+        {% for error in form.password.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+      </div>
+      <button type="submit" class="btn" style="width:100%;">Sign in</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

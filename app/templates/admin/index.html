@@ -1,0 +1,49 @@
+{% extends "admin/base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Dashboard</h2>
+</div>
+
+<div class="row" style="margin-bottom:1.5rem;">
+  <div class="card" style="flex:1; min-width:200px;">
+    <h3>Total messages</h3>
+    <p style="font-size:2rem; font-weight:700; margin:0.25rem 0 0;">{{ total }}</p>
+  </div>
+  <div class="card" style="flex:1; min-width:200px;">
+    <h3>Connection status</h3>
+    {% if connection_summary %}
+      <p style="margin:0.5rem 0 0;">
+        <span class="badge badge-{{ connection_summary.overall }}">{{ connection_summary.overall | upper }}</span>
+        <span class="muted" style="font-size:0.8rem;">as of {{ connection_summary.tested_at }}</span>
+      </p>
+    {% else %}
+      <p class="muted" style="margin:0.5rem 0 0;">Not tested yet.</p>
+    {% endif %}
+    <p style="margin:0.75rem 0 0;"><a class="btn btn-outline btn-sm" href="{{ url_for('admin.connection') }}">Run diagnostics</a></p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Recent messages</h3>
+  {% if recent %}
+  <table>
+    <thead><tr><th>From</th><th>Received</th><th>Duration</th><th></th></tr></thead>
+    <tbody>
+      {% for r in recent %}
+      <tr>
+        <td>{{ r['caller_id'] or 'unknown' }}</td>
+        <td>{{ r['created_at'] }}</td>
+        <td>{{ r['duration'] }}s</td>
+        <td><a class="btn btn-outline btn-sm" href="{{ url_for('admin.message_detail', message_id=r['id']) }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin-top:1rem;"><a href="{{ url_for('admin.messages') }}">View all messages →</a></p>
+  {% else %}
+  <p class="muted">No messages yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

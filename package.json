@@ -1,0 +1,12 @@
+{
+  "name": "family-call-center-assets",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vendors Basecoat CSS/JS/Jinja assets into the Flask app for offline-capable admin UI.",
+  "scripts": {
+    "vendor": "bash scripts/vendor-basecoat.sh"
+  },
+  "devDependencies": {
+    "basecoat-css": "^1.0.1"
+  }
+}

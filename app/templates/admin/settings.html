@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Settings</h2>
+</div>
+
+<div class="card">
+  <p class="muted" style="margin-top:0;">These prompts are read aloud by the IVR. Twilio credentials and URLs are configured via environment variables, not here.</p>
+  <form method="post" action="{{ url_for('admin.settings') }}" data-trim>
+    {{ form.csrf_token }}
+
+    <div class="field">
+      <label class="label" for="greeting">Main menu greeting</label>
+      <textarea class="input" id="greeting" name="greeting" rows="2" maxlength="500" required>{{ form.greeting.data or '' }}</textarea>
+      {% for error in form.greeting.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="invalid_digit_message">Invalid input message</label>
+      <textarea class="input" id="invalid_digit_message" name="invalid_digit_message" rows="2" maxlength="500" required>{{ form.invalid_digit_message.data or '' }}</textarea>
+      {% for error in form.invalid_digit_message.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="voicemail_prompt">Voicemail prompt</label>
+      <textarea class="input" id="voicemail_prompt" name="voicemail_prompt" rows="3" maxlength="500" required>{{ form.voicemail_prompt.data or '' }}</textarea>
+      {% for error in form.voicemail_prompt.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="voicemail_thanks">Thank-you message</label>
+      <textarea class="input" id="voicemail_thanks" name="voicemail_thanks" rows="2" maxlength="500" required>{{ form.voicemail_thanks.data or '' }}</textarea>
+      {% for error in form.voicemail_thanks.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="max_recording_seconds">Max recording length (seconds)</label>
+      <input class="input" id="max_recording_seconds" name="max_recording_seconds" type="number"
+             min="10" max="600" required value="{{ form.max_recording_seconds.data or 300 }}" style="max-width:160px;" />
+      {% for error in form.max_recording_seconds.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <button type="submit" class="btn">Save settings</button>
+  </form>
+</div>
+{% endblock %}
