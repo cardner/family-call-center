@@ -125,6 +125,8 @@ US A2P 10DLC), then add recipient numbers on the admin Settings page.
 - `POST /voicemail/callback` — receives recording callback and saves audio
 - `POST /voicemail/transcribe` — receives Twilio transcription (when enabled)
 - `GET /health` — basic health check
+- `GET /privacy-policy` — public privacy policy
+- `GET /terms-and-conditions` — public terms and conditions
 - `/admin/*` — admin UI (session auth; see [docs/ADMIN.md](docs/ADMIN.md))
 
 ## Project structure

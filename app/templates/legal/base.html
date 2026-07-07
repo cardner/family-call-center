@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Legal{% endblock %} · Family Call Center</title>
+  <style>
+    :root { --border: #e5e7eb; --muted: #6b7280; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #f9fafb;
+      color: #111827;
+      line-height: 1.6;
+    }
+    a { color: #1d4ed8; }
+    .page {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+    .page-header {
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-header h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.75rem;
+      font-weight: 700;
+    }
+    .page-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .legal-content h2 {
+      margin: 1.75rem 0 0.5rem;
+      font-size: 1.1rem;
+    }
+    .legal-content h2:first-child { margin-top: 0; }
+    .legal-content p,
+    .legal-content ul {
+      margin: 0 0 1rem;
+    }
+    .legal-content ul {
+      padding-left: 1.25rem;
+    }
+    .legal-content li { margin-bottom: 0.35rem; }
+    .legal-footer {
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <h1>{% block heading %}{% endblock %}</h1>
+      <p>Family Call Center · {% block effective_date %}Last updated: July 7, 2026{% endblock %}</p>
+    </header>
+    <article class="legal-content">
+      {% block content %}{% endblock %}
+    </article>
+    <footer class="legal-footer">
+      <p>
+        <a href="{{ url_for('legal.privacy_policy') }}">Privacy Policy</a>
+        ·
+        <a href="{{ url_for('legal.terms_and_conditions') }}">Terms and Conditions</a>
+      </p>
+    </footer>
+  </main>
+</body>
+</html>

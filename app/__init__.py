@@ -31,11 +31,13 @@ def create_app():
 
     from app.routes.admin import admin_bp
     from app.routes.ivr import ivr_bp
+    from app.routes.legal import legal_bp
     from app.routes.voicemail import voicemail_bp
 
     app.register_blueprint(ivr_bp)
     app.register_blueprint(voicemail_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(legal_bp)
 
     # Twilio webhooks authenticate via request signature, not CSRF tokens, so the
     # webhook blueprints are exempt from CSRF protection.
