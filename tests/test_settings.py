@@ -27,3 +27,12 @@ def test_settings_post_updates_twiml(auth_client):
     with auth_client.application.test_request_context():
         twiml = main_menu_twiml().get_data(as_text=True)
     assert "Fresh custom greeting here" in twiml
+
+
+def test_notify_phone_numbers_default_empty(app):
+    assert get_setting("notify_phone_numbers") == ""
+
+
+def test_notify_phone_numbers_persists(app):
+    set_setting("notify_phone_numbers", "+15551234567,+15559876543")
+    assert get_setting("notify_phone_numbers") == "+15551234567,+15559876543"

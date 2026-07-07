@@ -1,0 +1,78 @@
+{% extends "admin/base.html" %}
+{% block title %}Blocklist{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Blocklist</h2>
+  <a class="btn btn-sm" href="{{ url_for('admin.blocked_new') }}">Add number</a>
+</div>
+
+<p class="muted" style="margin-top:0;">Calls from these numbers are stopped at the front door before they reach the menu or voicemail. Choose how they are handled on the <a href="{{ url_for('admin.settings') }}">Settings</a> page.</p>
+
+<div class="card">
+  {% if blocked %}
+  <table>
+    <thead><tr><th>Phone</th><th>Note</th><th>Source</th><th>Added</th><th></th></tr></thead>
+    <tbody>
+      {% for b in blocked %}
+      <tr>
+        <td>{{ b['phone'] }}</td>
+        <td>{{ b['note'] or '' }}</td>
+        <td>
+          {% if b['source'] == 'user' %}
+            <span class="badge badge-info">Manual</span>
+          {% else %}
+            <span class="badge badge-warn">Imported</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ format_recorded_at(b['created_at']) }}</td>
+        <td class="row" style="gap:0.5rem; border:none;">
+          <a class="btn btn-outline btn-sm" href="{{ url_for('admin.blocked_edit', blocked_id=b['id']) }}">Edit</a>
+          <form method="post" action="{{ url_for('admin.blocked_delete', blocked_id=b['id']) }}"
+                onsubmit="return confirm('Unblock this number?');">
+            {{ delete_form.csrf_token }}
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No blocked numbers yet. Add one manually, or import a starter list below.</p>
+  {% endif %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="row" style="margin-top:1rem; align-items:center;">
+  {% if page > 1 %}
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.blocked', page=page-1, per_page=per_page) }}">Previous</a>
+  {% endif %}
+  <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.blocked', page=page+1, per_page=per_page) }}">Next</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3>Starter blocklist</h3>
+  <p class="muted" style="margin-top:0;">Optionally preload known spam numbers from the community-maintained <a href="https://github.com/SysAdminDoc/CallShield" target="_blank" rel="noopener noreferrer">CallShield</a> database (MIT licensed, sourced from FCC and FTC complaints). Only frequently reported robocall, scam, and telemarketer numbers are imported. Your manually blocked numbers are never affected.</p>
+  {% if seed_count %}
+  <p class="muted" style="margin:0 0 1rem;">{{ seed_count }} imported number(s) currently in the blocklist.</p>
+  {% endif %}
+  <div class="row" style="align-items:center;">
+    <form method="post" action="{{ url_for('admin.blocked_import_starter') }}">
+      {{ import_form.csrf_token }}
+      <button type="submit" class="btn btn-outline">Import starter blocklist</button>
+    </form>
+    {% if seed_count %}
+    <form method="post" action="{{ url_for('admin.blocked_remove_imported') }}"
+          onsubmit="return confirm('Remove all imported numbers? Your manually blocked numbers stay.');">
+      {{ import_form.csrf_token }}
+      <button type="submit" class="btn btn-danger">Remove imported list</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

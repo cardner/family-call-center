@@ -47,6 +47,24 @@
 </div>
 
 <div class="card" style="margin-top:1.5rem;">
+  <h3>SMS notifications
+    <span class="badge badge-{{ 'pass' if notifications.enabled else 'info' }}" style="margin-left:0.5rem;">{{ 'ON' if notifications.enabled else 'OFF' }}</span>
+  </h3>
+  {% if notifications.enabled %}
+  <p style="margin:0 0 0.75rem;">A new-voicemail alert is sent to {{ notifications.recipient_count }} recipient(s):
+    <span class="muted">{{ notifications.masked_recipients | join(', ') }}</span>
+  </p>
+  <form method="post" action="{{ url_for('admin.notification_test') }}">
+    {{ notification_form.csrf_token }}
+    <button type="submit" class="btn btn-outline">Send test SMS</button>
+  </form>
+  {% else %}
+  <p class="muted" style="margin:0;">No recipients configured. Add phone numbers on the
+    <a href="{{ url_for('admin.settings') }}">Settings page</a> to enable SMS alerts.</p>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:1.5rem;">
   <h3>Manual step</h3>
   <p style="margin:0;">Place a test call to <strong>{{ phone_number }}</strong>, then check the
     <a href="{{ url_for('admin.messages') }}">messages inbox</a> for the recording.</p>

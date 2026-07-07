@@ -29,12 +29,31 @@ def test_script_in_greeting_is_stripped_and_twiml_safe(auth_client):
         follow_redirects=True,
     )
     stored = get_setting("greeting")
-    assert "<" not in stored and ">" not in stored
+    assert "<script" not in stored.lower()
     assert "Hello" in stored
 
     with auth_client.application.test_request_context():
         twiml = main_menu_twiml().get_data(as_text=True)
-    assert "<script" not in twiml
+    assert "<script" not in twiml.lower()
+
+
+def test_ssml_greeting_renders_break_and_emphasis_in_twiml(auth_client):
+    greeting = (
+        'Hi. <break time="300ms"/> '
+        '<emphasis level="moderate">press 1</emphasis>.'
+    )
+    auth_client.post(
+        "/admin/settings",
+        data=valid_settings(greeting=greeting),
+        follow_redirects=True,
+    )
+    assert get_setting("greeting") == greeting
+
+    with auth_client.application.test_request_context():
+        twiml = main_menu_twiml().get_data(as_text=True)
+    assert '<break time="300ms"' in twiml
+    assert '<emphasis level="moderate">press 1</emphasis>' in twiml
+    assert "&lt;break" not in twiml
 
 
 def test_login_open_redirect_blocked(client):

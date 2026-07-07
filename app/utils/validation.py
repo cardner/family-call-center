@@ -7,6 +7,8 @@ param, or a Twilio webhook body is treated as untrusted.
 
 import re
 
+from app.utils.ssml import normalize_ivr_ssml
+
 # Characters below 0x20 (control chars) plus DEL. We strip these from all text
 # input; they have no place in caller IDs, settings, or spoken prompts.
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -30,16 +32,13 @@ def sanitize_text(value, max_length=None):
 
 
 def sanitize_ivr_text(value, max_length=500):
-    """Sanitize free text destined for a TwiML ``<Say>`` prompt.
+    """Sanitize IVR prompt text, allowing a small whitelist of SSML tags.
 
-    Removes angle brackets so no HTML/XML markup can be stored, then applies the
-    generic text sanitizer. Twilio XML-escapes the remaining characters (e.g.
-    ``&``) automatically when the TwiML is serialized, so callers must NOT
-    pre-escape before passing the value to ``vr.say``.
+    Unknown tags are stripped and allowed SSML attributes are normalized.
     """
     if value is None:
         return ""
-    text = str(value).replace("<", "").replace(">", "")
+    text = normalize_ivr_ssml(str(value))
     return sanitize_text(text, max_length=max_length)
 
 

@@ -12,6 +12,13 @@
     <p style="font-size:2rem; font-weight:700; margin:0.25rem 0 0;">{{ total }}</p>
   </div>
   <div class="card" style="flex:1; min-width:200px;">
+    <h3>Unread</h3>
+    <p style="font-size:2rem; font-weight:700; margin:0.25rem 0 0;">{{ unread }}</p>
+    {% if unread %}
+    <p style="margin:0.5rem 0 0;"><a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', unread=1) }}">View unread</a></p>
+    {% endif %}
+  </div>
+  <div class="card" style="flex:1; min-width:200px;">
     <h3>Connection status</h3>
     {% if connection_summary %}
       <p style="margin:0.5rem 0 0;">
@@ -23,25 +30,62 @@
     {% endif %}
     <p style="margin:0.75rem 0 0;"><a class="btn btn-outline btn-sm" href="{{ url_for('admin.connection') }}">Run diagnostics</a></p>
   </div>
+  <div class="card" style="flex:1; min-width:200px;">
+    <h3>SMS notifications</h3>
+    <p style="margin:0.5rem 0 0;">
+      <span class="badge badge-{{ 'pass' if notifications.enabled else 'info' }}">{{ 'ON' if notifications.enabled else 'OFF' }}</span>
+      {% if notifications.enabled %}<span class="muted" style="font-size:0.8rem;">{{ notifications.recipient_count }} recipient(s)</span>{% endif %}
+    </p>
+    <p style="margin:0.75rem 0 0;">
+      {% if notifications.enabled %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.connection') }}">Test</a>
+      {% else %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.settings') }}">Configure</a>
+      {% endif %}
+    </p>
+  </div>
 </div>
 
-<div class="card">
-  <h3>Recent messages</h3>
+<div class="card card-table">
+  <h3 style="padding:1.25rem 1.25rem 0; margin:0;">Recent messages</h3>
   {% if recent %}
-  <table>
-    <thead><tr><th>From</th><th>Received</th><th>Duration</th><th></th></tr></thead>
-    <tbody>
-      {% for r in recent %}
-      <tr>
-        <td>{{ r['caller_id'] or 'unknown' }}</td>
-        <td>{{ r['created_at'] }}</td>
-        <td>{{ r['duration'] }}s</td>
-        <td><a class="btn btn-outline btn-sm" href="{{ url_for('admin.message_detail', message_id=r['id']) }}">Open</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <p style="margin-top:1rem;"><a href="{{ url_for('admin.messages') }}">View all messages →</a></p>
+  <div class="table-scroll">
+    <table class="messages-table">
+      <thead>
+        <tr>
+          <th class="col-from">From</th>
+          <th class="col-received">Received</th>
+          <th class="col-duration">Duration</th>
+          <th class="col-actions"><span class="muted">Action</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recent %}
+        <tr class="message-row{{ ' unread' if not r['read_at'] }}"
+            data-row-href="{{ url_for('admin.message_detail', message_id=r['id']) }}">
+          <td class="cell-from">
+            {% if not r['read_at'] %}<span class="badge badge-new">New</span>{% endif %}
+            <span>{{ caller_label(r['caller_id']) }}</span>
+          </td>
+          <td class="cell-meta" aria-hidden="true">
+            <span>{{ format_recorded_at(r['created_at']) }}</span>
+            <span>{{ r['duration'] }}s</span>
+          </td>
+          <td class="cell-received">
+            <time datetime="{{ r['created_at'] }}">{{ format_recorded_at(r['created_at']) }}</time>
+          </td>
+          <td class="cell-duration">{{ r['duration'] }}s</td>
+          <td class="cell-actions">
+            <a class="btn btn-outline btn-sm btn-desktop-only"
+               href="{{ url_for('admin.message_detail', message_id=r['id']) }}">Open</a>
+            <span class="btn btn-outline btn-sm btn-mobile-only">View message</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p style="padding:0 1.25rem 1.25rem; margin:1rem 0 0;"><a href="{{ url_for('admin.messages') }}">View all messages →</a></p>
   {% else %}
   <p class="muted">No messages yet.</p>
   {% endif %}

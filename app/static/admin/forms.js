@@ -20,6 +20,12 @@
 
   // Copy-to-clipboard for webhook URL blocks on the connection page.
   document.addEventListener("click", function (event) {
+    var row = event.target.closest("[data-row-href]");
+    if (row && !event.target.closest("a, button, form, input, textarea, select, label")) {
+      window.location.href = row.getAttribute("data-row-href");
+      return;
+    }
+
     var button = event.target.closest("[data-copy-btn]");
     if (!button) {
       return;

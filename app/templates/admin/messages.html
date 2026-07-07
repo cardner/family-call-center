@@ -4,44 +4,92 @@
 {% block content %}
 <div class="app-topbar">
   <h2 class="app-title">Messages</h2>
-  <span class="muted">{{ total }} total</span>
+  <span class="muted">{{ total }} total{% if unread_count %} · {{ unread_count }} unread{% endif %}</span>
 </div>
 
-<form method="get" action="{{ url_for('admin.messages') }}" class="row" style="margin-bottom:1rem;" data-trim>
-  <input class="input" name="q" type="text" maxlength="32" placeholder="Filter by caller ID"
-         value="{{ query }}" style="max-width:280px;" />
-  <button class="btn btn-outline" type="submit">Search</button>
-</form>
+<div class="messages-toolbar">
+  <form method="get" action="{{ url_for('admin.messages') }}" class="messages-search" data-trim>
+    <input class="input" name="q" type="search" maxlength="64" placeholder="Search caller, name, or transcript"
+           value="{{ query }}" />
+    {% if unread_only %}<input type="hidden" name="unread" value="1" />{% endif %}
+    <button class="btn btn-outline" type="submit">Search</button>
+  </form>
+  <div class="messages-filters">
+    {% if unread_only %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', q=query or None) }}">Show all</a>
+    {% else %}
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', unread=1, q=query or None) }}">Unread only</a>
+    {% endif %}
+    <form method="post" action="{{ url_for('admin.messages_mark_all_read') }}">
+      {{ mark_all_read_form.csrf_token }}
+      <button type="submit" class="btn btn-outline btn-sm">Mark all read</button>
+    </form>
+  </div>
+</div>
 
-<div class="card">
+<div class="card card-table">
   {% if recordings %}
-  <table>
-    <thead><tr><th>From</th><th>Received</th><th>Duration</th><th>Size</th><th></th></tr></thead>
-    <tbody>
-      {% for r in recordings %}
-      <tr>
-        <td>{{ r['caller_id'] or 'unknown' }}</td>
-        <td>{{ r['created_at'] }}</td>
-        <td>{{ r['duration'] }}s</td>
-        <td>{{ (r['file_size'] or 0) // 1024 }} KB</td>
-        <td><a class="btn btn-outline btn-sm" href="{{ url_for('admin.message_detail', message_id=r['id']) }}">Open</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-scroll">
+    <table class="messages-table">
+      <thead>
+        <tr>
+          <th class="col-from">From</th>
+          <th class="col-preview">Preview</th>
+          <th class="col-received">Received</th>
+          <th class="col-duration">Duration</th>
+          <th class="col-actions"><span class="muted">Action</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recordings %}
+        <tr class="message-row{{ ' unread' if not r['read_at'] }}"
+            data-row-href="{{ url_for('admin.message_detail', message_id=r['id']) }}">
+          <td class="cell-from">
+            {% if not r['read_at'] %}<span class="badge badge-new">New</span>{% endif %}
+            <span>{{ caller_label(r['caller_id']) }}</span>
+          </td>
+          <td class="cell-preview">
+            {% if r['transcript_status'] == 'complete' and r['transcript'] %}
+              <span class="preview" title="{{ r['transcript'] }}">{{ r['transcript'] }}</span>
+            {% elif r['transcript_status'] == 'pending' %}
+              <span class="muted">Transcribing…</span>
+            {% elif r['transcript_status'] == 'failed' %}
+              <span class="muted">Transcription failed</span>
+            {% else %}
+              <span class="muted">No transcript</span>
+            {% endif %}
+          </td>
+          <td class="cell-meta" aria-hidden="true">
+            <span>{{ format_recorded_at(r['created_at']) }}</span>
+            <span>{{ r['duration'] }}s</span>
+          </td>
+          <td class="cell-received">
+            <time datetime="{{ r['created_at'] }}">{{ format_recorded_at(r['created_at']) }}</time>
+          </td>
+          <td class="cell-duration">{{ r['duration'] }}s</td>
+          <td class="cell-actions">
+            <a class="btn btn-outline btn-sm btn-desktop-only"
+               href="{{ url_for('admin.message_detail', message_id=r['id']) }}">Open</a>
+            <span class="btn btn-outline btn-sm btn-mobile-only">View message</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
-  <p class="muted">No messages found.</p>
+  <p class="muted" style="padding:1.25rem; margin:0;">No messages found.</p>
   {% endif %}
 </div>
 
 {% if total_pages > 1 %}
-<div class="row" style="margin-top:1rem; align-items:center;">
+<div class="messages-pagination">
   {% if page > 1 %}
-    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page-1, per_page=per_page, q=query or None) }}">Previous</a>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page-1, per_page=per_page, q=query or None, unread=1 if unread_only else None) }}">Previous</a>
   {% endif %}
   <span class="muted">Page {{ page }} of {{ total_pages }}</span>
   {% if page < total_pages %}
-    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page+1, per_page=per_page, q=query or None) }}">Next</a>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page+1, per_page=per_page, q=query or None, unread=1 if unread_only else None) }}">Next</a>
   {% endif %}
 </div>
 {% endif %}

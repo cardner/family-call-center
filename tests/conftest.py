@@ -35,6 +35,8 @@ def _reset_db():
     with get_connection() as conn:
         conn.execute("DELETE FROM recordings")
         conn.execute("DELETE FROM settings")
+        conn.execute("DELETE FROM contacts")
+        conn.execute("DELETE FROM blocked_numbers")
         conn.commit()
     # Re-seed default settings after wiping.
     from app.utils.settings import seed_default_settings
@@ -91,7 +93,15 @@ def make_app():
 def sample_recording():
     """Insert a recording row and write its WAV file. Returns metadata dict."""
 
-    def _create(caller_id="+15551234567", subdir="2026/07/05", name="msg.wav"):
+    def _create(
+        caller_id="+15551234567",
+        subdir="2026/07/05",
+        name="msg.wav",
+        transcript=None,
+        transcript_status="disabled",
+        read_at=None,
+        twilio_sid=None,
+    ):
         rel_path = os.path.join(subdir, name)
         abs_dir = os.path.join(Config.RECORDINGS_DIR, subdir)
         os.makedirs(abs_dir, exist_ok=True)
@@ -99,20 +109,24 @@ def sample_recording():
         with open(abs_path, "wb") as handle:
             handle.write(WAV_BYTES)
 
-        log_recording(
+        recording_id = log_recording(
             created_at="2026-07-05T12:00:00+00:00",
             caller_id=caller_id,
             duration=12,
             filename=rel_path,
             file_size=len(WAV_BYTES),
-            twilio_sid="RE" + "a" * 32,
+            twilio_sid=twilio_sid or ("RE" + "a" * 32),
+            transcript_status=transcript_status,
         )
-        with get_connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM recordings ORDER BY id DESC LIMIT 1"
-            ).fetchone()
+        if transcript is not None or read_at is not None:
+            with get_connection() as conn:
+                conn.execute(
+                    "UPDATE recordings SET transcript = ?, read_at = ? WHERE id = ?",
+                    (transcript, read_at, recording_id),
+                )
+                conn.commit()
         return {
-            "id": row["id"],
+            "id": recording_id,
             "filename": rel_path,
             "abs_path": abs_path,
             "caller_id": caller_id,

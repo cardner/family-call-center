@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">{{ heading }}</h2>
+  <a class="btn btn-outline btn-sm" href="{{ url_for('admin.contacts') }}">← Back</a>
+</div>
+
+<div class="card">
+  <form method="post" data-trim>
+    {{ form.csrf_token }}
+
+    <div class="field">
+      <label class="label" for="display_name">Display name</label>
+      <input class="input" id="display_name" name="display_name" type="text" maxlength="120"
+             required value="{{ form.display_name.data or '' }}" placeholder="Mom" style="max-width:360px;" />
+      {% for error in form.display_name.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="phone">Phone number</label>
+      <input class="input" id="phone" name="phone" type="text" maxlength="32"
+             required value="{{ form.phone.data or '' }}" placeholder="+15551234567" style="max-width:360px;" />
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">E.164 preferred (<code>+15551234567</code>). A bare 10-digit number is treated as US.</p>
+      {% for error in form.phone.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="skip_ivr_menu" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="skip_ivr_menu" name="skip_ivr_menu" type="checkbox" value="y"
+               style="width:auto;" {{ 'checked' if form.skip_ivr_menu.data }} />
+        Skip the menu and go straight to voicemail
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When this contact calls, they skip the "Press 1" menu and can leave a voicemail right away.</p>
+    </div>
+
+    <button type="submit" class="btn">Save contact</button>
+  </form>
+</div>
+{% endblock %}

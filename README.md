@@ -12,8 +12,20 @@ messages and IVR prompts, and an automated test suite.
 
 ## Features
 - **Voicemail IVR** over Twilio with signature-verified webhooks.
+- **SMS notifications** — when a voicemail is saved, an optional text alert with a
+  link to the message is sent to one or more recipients. Numbers are managed from
+  the admin UI (no redeploy), and delivery can be tested from the Connection page.
 - **Admin UI** (`/admin`) — session login, message inbox with audio playback and
   delete, editable IVR/voicemail prompts, and Twilio ↔ NAS connection diagnostics.
+- **Voicemail transcription** using Twilio's built-in speech-to-text (single
+  vendor, billed to your Twilio account). Transcripts are searchable and shown in
+  the inbox and on the message detail page. Toggle it on from the Settings page.
+- **Read / unread tracking** — unread messages are bolded and badged, the
+  dashboard and Messages nav show an unread count, and there is a "mark all read"
+  action.
+- **Contacts address book** — map phone numbers to friendly names ("Mom",
+  "Dr. Smith's office") shown wherever a caller ID appears, editable in the admin
+  UI with optional CSV import.
 - **Configurable prompts** stored in SQLite and editable from the UI (no code
   change or redeploy needed to change greetings or the max recording length).
 - **Security controls** — CSRF protection, login rate limiting, hardened session
@@ -22,7 +34,8 @@ messages and IVR prompts, and an automated test suite.
   `docker-compose` on an external NPM network, and publish/deploy scripts.
 - **Secret management** via the 1Password CLI (`op inject` / `op run`).
 - **Tests** — a pytest suite covering IVR, auth, CSRF, rate limiting, validation,
-  output encoding, messages, settings, and connection diagnostics.
+  output encoding, messages, transcription, read/unread, contacts, settings, and
+  connection diagnostics.
 
 ## Why this repo exists
 This repo is a lightweight public wrapper around my personal project so people can see the rough implementation.
@@ -100,12 +113,17 @@ In Twilio phone number settings:
 - Voice webhook URL: `https://your-public-hostname.example.com/call`
 - Method: `POST`
 
+To enable SMS notifications for new voicemails, follow the Twilio Console steps in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (SMS capability, trial verification, and
+US A2P 10DLC), then add recipient numbers on the admin Settings page.
+
 ## Endpoints
 - `POST /call` — main menu (Press 1 for voicemail)
 - `POST /call/route` — routes keypad selection
 - `POST /voicemail` — starts recording
 - `POST /voicemail/done` — thanks caller and hangs up
 - `POST /voicemail/callback` — receives recording callback and saves audio
+- `POST /voicemail/transcribe` — receives Twilio transcription (when enabled)
 - `GET /health` — basic health check
 - `/admin/*` — admin UI (session auth; see [docs/ADMIN.md](docs/ADMIN.md))
 
@@ -115,8 +133,9 @@ app/
   __init__.py            # app factory: blueprints, CSRF, rate limiter, sessions
   extensions.py          # shared CSRF + limiter instances
   routes/                # ivr.py, voicemail.py (Twilio), admin.py (admin UI)
-  forms/admin_forms.py   # WTForms (login, settings, delete, etc.)
-  utils/                 # auth, db, settings, validation, twiml, connection_test
+  forms/admin_forms.py   # WTForms (login, settings, delete, contacts, etc.)
+  utils/                 # auth, db, settings, validation, twiml, connection_test,
+                         #   phone, contacts, transcription-aware voicemail flow
   templates/admin/       # Basecoat-skinned admin pages
   static/                # admin JS + vendored Basecoat assets
 config.py                # environment-driven configuration

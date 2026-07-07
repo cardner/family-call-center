@@ -1,0 +1,63 @@
+{% extends "admin/base.html" %}
+{% block title %}Contacts{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Contacts</h2>
+  <a class="btn btn-sm" href="{{ url_for('admin.contact_new') }}">Add contact</a>
+</div>
+
+<p class="muted" style="margin-top:0;">Map phone numbers to friendly names like "Mom" or "Dr. Smith's office". Names show wherever a caller ID appears.</p>
+
+<div class="card">
+  {% if contacts %}
+  <table>
+    <thead><tr><th>Name</th><th>Phone</th><th></th></tr></thead>
+    <tbody>
+      {% for c in contacts %}
+      <tr>
+        <td>{{ c['display_name'] }}{% if c['skip_ivr_menu'] %} <span class="badge badge-info">Skips menu</span>{% endif %}</td>
+        <td>{{ c['phone'] }}</td>
+        <td class="row" style="gap:0.5rem; border:none;">
+          <a class="btn btn-outline btn-sm" href="{{ url_for('admin.contact_edit', contact_id=c['id']) }}">Edit</a>
+          <form method="post" action="{{ url_for('admin.contact_delete', contact_id=c['id']) }}"
+                onsubmit="return confirm('Delete this contact?');">
+            {{ delete_form.csrf_token }}
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">No contacts yet.</p>
+  {% endif %}
+</div>
+
+{% if total_pages > 1 %}
+<div class="row" style="margin-top:1rem; align-items:center;">
+  {% if page > 1 %}
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.contacts', page=page-1, per_page=per_page) }}">Previous</a>
+  {% endif %}
+  <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+  {% if page < total_pages %}
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.contacts', page=page+1, per_page=per_page) }}">Next</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:1.5rem;">
+  <h3>Import from CSV</h3>
+  <p class="muted" style="margin-top:0;">Upload a CSV with two columns: <code>phone,display_name</code>. A header row is optional. Existing numbers are updated. Bare 10-digit numbers are treated as US (+1).</p>
+  <pre class="muted" style="margin:0 0 1rem; white-space:pre-wrap;">phone,display_name
++15551234567,Mom
+5559876543,Dr. Smith</pre>
+  <form method="post" action="{{ url_for('admin.contacts_import') }}" enctype="multipart/form-data" class="row" style="align-items:center;">
+    {{ import_form.csrf_token }}
+    <input class="input" type="file" name="file" accept=".csv" required style="max-width:320px;" />
+    <button type="submit" class="btn btn-outline">Import</button>
+  </form>
+  {% for error in import_form.file.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+</div>
+{% endblock %}

@@ -2,36 +2,76 @@
 {% block title %}Settings{% endblock %}
 
 {% block content %}
+<script type="application/json" id="ivr-voice-meta">{{ ivr_voice_meta | tojson }}</script>
+<script src="{{ url_for('static', filename='admin/settings.js') }}" defer></script>
+
 <div class="app-topbar">
   <h2 class="app-title">Settings</h2>
 </div>
 
 <div class="card">
-  <p class="muted" style="margin-top:0;">These prompts are read aloud by the IVR. Twilio credentials and URLs are configured via environment variables, not here.</p>
+  <p class="muted" style="margin-top:0;">These prompts are read aloud by the IVR using a neural voice. You can add SSML tags for pauses and emphasis. Twilio credentials and URLs are configured via environment variables, not here.</p>
+  <details class="muted" style="margin-bottom:1rem;">
+    <summary style="cursor:pointer;">SSML reference (pauses &amp; emphasis)</summary>
+    <ul style="margin:0.5rem 0 0 1.25rem; padding:0;">
+      <li><code>&lt;break time="300ms"/&gt;</code> — short pause (use <code>200ms</code>–<code>500ms</code>)</li>
+      <li><code>&lt;emphasis level="moderate"&gt;press 1&lt;/emphasis&gt;</code> — stress key words (<code>strong</code>, <code>moderate</code>, or <code>reduced</code>)</li>
+      <li><code>&lt;prosody rate="slow"&gt;slower text&lt;/prosody&gt;</code> — slower delivery (<code>slow</code>, <code>medium</code>, <code>fast</code>)</li>
+    </ul>
+    <p style="margin:0.5rem 0 0;">Example greeting:</p>
+    <pre class="muted" style="margin:0.25rem 0 0; white-space:pre-wrap;">Welcome. &lt;break time="300ms"/&gt; To leave a voicemail, &lt;emphasis level="moderate"&gt;press 1&lt;/emphasis&gt;.</pre>
+  </details>
   <form method="post" action="{{ url_for('admin.settings') }}" data-trim>
     {{ form.csrf_token }}
 
     <div class="field">
-      <label class="label" for="greeting">Main menu greeting</label>
-      <textarea class="input" id="greeting" name="greeting" rows="2" maxlength="500" required>{{ form.greeting.data or '' }}</textarea>
+      <label class="label" for="ivr_voice">IVR voice</label>
+      <select class="input" id="ivr_voice" name="ivr_voice" required style="max-width:28rem;">
+        {% for group_label, options in form.ivr_voice.choices.items() %}
+        <optgroup label="{{ group_label }}">
+          {% for value, label in options %}
+          <option value="{{ value }}" {{ 'selected' if form.ivr_voice.data == value }}>{{ label }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Google Neural2 voices (via Twilio), grouped by region and gender. Used for live IVR calls; browser preview approximates locale and gender.</p>
+      {% for error in form.ivr_voice.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <div class="field-label-row">
+        <label class="label" for="greeting">Main menu greeting</label>
+        <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="greeting">Preview</button>
+      </div>
+      <textarea class="input" id="greeting" name="greeting" rows="3" maxlength="500" required style="font-family:ui-monospace, monospace;">{{ form.greeting.data or '' }}</textarea>
       {% for error in form.greeting.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="field">
-      <label class="label" for="invalid_digit_message">Invalid input message</label>
-      <textarea class="input" id="invalid_digit_message" name="invalid_digit_message" rows="2" maxlength="500" required>{{ form.invalid_digit_message.data or '' }}</textarea>
+      <div class="field-label-row">
+        <label class="label" for="invalid_digit_message">Invalid input message</label>
+        <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="invalid_digit_message">Preview</button>
+      </div>
+      <textarea class="input" id="invalid_digit_message" name="invalid_digit_message" rows="3" maxlength="500" required style="font-family:ui-monospace, monospace;">{{ form.invalid_digit_message.data or '' }}</textarea>
       {% for error in form.invalid_digit_message.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="field">
-      <label class="label" for="voicemail_prompt">Voicemail prompt</label>
-      <textarea class="input" id="voicemail_prompt" name="voicemail_prompt" rows="3" maxlength="500" required>{{ form.voicemail_prompt.data or '' }}</textarea>
+      <div class="field-label-row">
+        <label class="label" for="voicemail_prompt">Voicemail prompt</label>
+        <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="voicemail_prompt">Preview</button>
+      </div>
+      <textarea class="input" id="voicemail_prompt" name="voicemail_prompt" rows="4" maxlength="500" required style="font-family:ui-monospace, monospace;">{{ form.voicemail_prompt.data or '' }}</textarea>
       {% for error in form.voicemail_prompt.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="field">
-      <label class="label" for="voicemail_thanks">Thank-you message</label>
-      <textarea class="input" id="voicemail_thanks" name="voicemail_thanks" rows="2" maxlength="500" required>{{ form.voicemail_thanks.data or '' }}</textarea>
+      <div class="field-label-row">
+        <label class="label" for="voicemail_thanks">Thank-you message</label>
+        <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="voicemail_thanks">Preview</button>
+      </div>
+      <textarea class="input" id="voicemail_thanks" name="voicemail_thanks" rows="3" maxlength="500" required style="font-family:ui-monospace, monospace;">{{ form.voicemail_thanks.data or '' }}</textarea>
       {% for error in form.voicemail_thanks.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
@@ -42,7 +82,56 @@
       {% for error in form.max_recording_seconds.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
+    <div class="field">
+      <label class="label" for="transcription_enabled" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="transcription_enabled" name="transcription_enabled" type="checkbox" value="y"
+               style="width:auto;" {{ 'checked' if form.transcription_enabled.data }} />
+        Enable voicemail transcription
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Uses Twilio's built-in speech-to-text and bills to your Twilio account. When on, recordings are transcribed and the text appears in the inbox. Twilio only transcribes messages under <strong>120 seconds</strong>, so the effective max recording length is capped at 120s while this is enabled.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="notify_phone_numbers">SMS notification recipients</label>
+      <textarea class="input" id="notify_phone_numbers" name="notify_phone_numbers" rows="3" maxlength="500" placeholder="+15551234567&#10;+15559876543" style="font-family:ui-monospace, monospace;">{{ form.notify_phone_numbers.data or '' }}</textarea>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">One number per line (or comma-separated) in E.164 format, e.g. <code>+15551234567</code>. Each gets an SMS when a voicemail is saved. Leave blank to disable. On a Twilio trial account, every number must be verified first.</p>
+      {% for error in form.notify_phone_numbers.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="block_action">Blocked caller handling</label>
+      <select class="input" id="block_action" name="block_action" required style="max-width:28rem;">
+        {% for value, label in form.block_action.choices %}
+        <option value="{{ value }}" {{ 'selected' if form.block_action.data == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">How calls from numbers on your <a href="{{ url_for('admin.blocked') }}">blocklist</a> are handled. Reject is silent; the message option reads the text below and then hangs up.</p>
+      {% for error in form.block_action.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <div class="field-label-row">
+        <label class="label" for="blocked_caller_message">Blocked caller message</label>
+        <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="blocked_caller_message">Preview</button>
+      </div>
+      <textarea class="input" id="blocked_caller_message" name="blocked_caller_message" rows="2" maxlength="500" style="font-family:ui-monospace, monospace;">{{ form.blocked_caller_message.data or '' }}</textarea>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Only used when "Play a message" is selected above. SSML tags are supported.</p>
+      {% for error in form.blocked_caller_message.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
     <button type="submit" class="btn">Save settings</button>
   </form>
+  <p class="muted" style="margin:1rem 0 0; font-size:0.8rem;">Preview uses your browser's built-in speech voices, so it is approximate. Live calls use the Twilio Neural2 voice selected above — call your number to hear the exact result.</p>
 </div>
+
+<style>
+  .field-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+  .field-label-row .label { margin-bottom: 0; }
+</style>
 {% endblock %}

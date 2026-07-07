@@ -1,5 +1,6 @@
 import app.routes.admin as admin_mod
 from app.utils import connection_test as ct
+from app.utils.settings import set_setting
 from config import Config
 
 
@@ -60,11 +61,35 @@ def _statuses(results):
 
 
 def test_all_checks_pass_with_valid_config():
+    set_setting("notify_phone_numbers", "+15551234567")
     results = ct.run_all_checks(
         client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
     )
     assert results["overall"] == "pass"
     assert all(check["status"] == "pass" for check in results["checks"])
+
+
+def test_sms_check_info_when_unconfigured():
+    results = ct.run_all_checks(
+        client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
+    )
+    assert _statuses(results)["SMS notifications configured"] == "info"
+
+
+def test_sms_check_pass_with_valid_number():
+    set_setting("notify_phone_numbers", "+15551234567")
+    results = ct.run_all_checks(
+        client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
+    )
+    assert _statuses(results)["SMS notifications configured"] == "pass"
+
+
+def test_sms_check_warns_when_all_invalid():
+    set_setting("notify_phone_numbers", "not-a-number,also-bad")
+    results = ct.run_all_checks(
+        client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
+    )
+    assert _statuses(results)["SMS notifications configured"] == "warn"
 
 
 def test_twilio_api_failure_marks_fail():

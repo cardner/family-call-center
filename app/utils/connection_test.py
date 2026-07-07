@@ -40,6 +40,7 @@ def webhook_urls():
         "voicemail": f"{base}/voicemail",
         "voicemail_done": f"{base}/voicemail/done",
         "voicemail_callback": f"{base}/voicemail/callback",
+        "voicemail_transcribe": f"{base}/voicemail/transcribe",
     }
 
 
@@ -186,6 +187,38 @@ def _check_public_health(http_get):
         )
 
 
+def _check_sms_notifications():
+    from app.utils.settings import (
+        get_notify_phone_numbers,
+        get_setting,
+        parse_phone_numbers,
+    )
+
+    raw = get_setting("notify_phone_numbers", "")
+    configured = parse_phone_numbers(raw)
+    valid = get_notify_phone_numbers()
+
+    if valid:
+        return _result(
+            "SMS notifications configured",
+            PASS,
+            f"New-voicemail alerts will be sent to {len(valid)} recipient(s).",
+        )
+    if configured:
+        return _result(
+            "SMS notifications configured",
+            WARN,
+            "Recipients are set but none are valid E.164 numbers.",
+            detail="Fix them on the Settings page (e.g. +15551234567).",
+        )
+    return _result(
+        "SMS notifications configured",
+        INFO,
+        "No SMS recipients configured (optional).",
+        detail="Add numbers on the Settings page to enable alerts.",
+    )
+
+
 def _check_webhook_signature():
     try:
         validator = RequestValidator(Config.TWILIO_AUTH_TOKEN)
@@ -237,6 +270,7 @@ def run_all_checks(client_factory=None, http_get=None):
     checks.append(_check_phone_number(client))
     checks.append(_check_public_health(http_get))
     checks.append(_check_webhook_signature())
+    checks.append(_check_sms_notifications())
 
     return {
         "checks": checks,

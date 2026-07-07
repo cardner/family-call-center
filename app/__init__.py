@@ -42,6 +42,25 @@ def create_app():
     csrf.exempt(ivr_bp)
     csrf.exempt(voicemail_bp)
 
+    @app.context_processor
+    def inject_admin_helpers():
+        """Expose contact-name resolution and the unread count to admin templates."""
+        from flask import session
+
+        if not session.get("admin_logged_in"):
+            return {}
+
+        from app.utils.contacts import caller_label, resolve_caller_display
+        from app.utils.db import count_unread_recordings
+        from app.utils.display import format_recorded_at
+
+        return {
+            "caller_label": caller_label,
+            "caller_display": resolve_caller_display,
+            "format_recorded_at": format_recorded_at,
+            "unread_count": count_unread_recordings(),
+        }
+
     @app.get("/health")
     def health():
         uptime_seconds = int(time.time() - START_TIME)

@@ -20,7 +20,7 @@
     .app-nav a { display: block; padding: 0.5rem 0.75rem; border-radius: 0.5rem; text-decoration: none; font-size: 0.9rem; }
     .app-nav a:hover { background: #f3f4f6; }
     .app-nav a.active { background: #111827; color: #fff; }
-    .app-main { flex: 1; padding: 1.5rem 2rem; max-width: 960px; }
+    .app-main { flex: 1; padding: 1.5rem 2rem; max-width: 72rem; width: 100%; }
     .app-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
     .app-title { font-size: 1.35rem; font-weight: 600; margin: 0; }
     .muted { color: var(--shell-muted); }
@@ -48,12 +48,158 @@
     .badge-warn { background: #fef9c3; color: #854d0e; }
     .badge-fail { background: #fee2e2; color: #991b1b; }
     .badge-info { background: #e0e7ff; color: #3730a3; }
+    .badge-unread { background: #2563eb; color: #fff; }
+    .badge-new { background: #2563eb; color: #fff; }
+    .preview { color: var(--shell-muted); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .transcript { white-space: pre-wrap; line-height: 1.5; }
+    .messages-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1rem;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .messages-search {
+      display: flex;
+      flex: 1 1 16rem;
+      gap: 0.5rem;
+      align-items: center;
+      min-width: 0;
+    }
+    .messages-search .input { flex: 1 1 auto; min-width: 0; max-width: 24rem; }
+    .messages-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .card-table { padding: 0; overflow: hidden; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .messages-table { table-layout: fixed; }
+    .messages-table th,
+    .messages-table td { vertical-align: middle; }
+    .messages-table .col-from { width: 16%; }
+    .messages-table .col-preview { width: auto; }
+    .messages-table .col-received { width: 14rem; }
+    .messages-table .col-duration { width: 4.5rem; }
+    .messages-table .col-actions { width: 5.5rem; }
+    .messages-table .cell-from { font-weight: 500; }
+    .messages-table .cell-preview { min-width: 0; }
+    .messages-table .cell-preview .preview {
+      display: block;
+      max-width: 100%;
+    }
+    .messages-table .cell-received {
+      color: var(--shell-muted);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    .messages-table .cell-duration {
+      color: var(--shell-muted);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+    .messages-table tbody tr.message-row { transition: background-color 0.12s ease; }
+    .messages-table tbody tr.message-row:hover { background: #f9fafb; }
+    .messages-table tbody tr.message-row.unread .cell-from { font-weight: 600; }
+    .messages-table tbody tr.message-row:last-child td { border-bottom: none; }
+    .messages-pagination {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1rem;
+    }
     .code-block { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; background: #f3f4f6; border: 1px solid var(--shell-border); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; margin-bottom: 0.5rem; }
     .code-block code { word-break: break-all; }
     @media (max-width: 720px) {
       .app-shell { flex-direction: column; }
       .app-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--shell-border); }
-      .app-main { padding: 1.25rem; }
+      .app-main { padding: 1rem; }
+      .app-topbar { flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
+      .messages-toolbar { flex-direction: column; align-items: stretch; }
+      .messages-search { flex-direction: column; align-items: stretch; width: 100%; }
+      .messages-search .input { max-width: none; }
+      .messages-filters { justify-content: stretch; }
+      .messages-filters form { flex: 1 1 auto; }
+      .messages-filters .btn { flex: 1 1 auto; justify-content: center; }
+    }
+    @media (max-width: 640px) {
+      .table-scroll { overflow: visible; }
+      .messages-table thead { display: none; }
+      .messages-table,
+      .messages-table tbody,
+      .messages-table tr,
+      .messages-table td { display: block; width: 100%; }
+      .messages-table tbody tr.message-row {
+        border: 1px solid var(--shell-border);
+        border-radius: 0.75rem;
+        margin: 0.75rem;
+        padding: 0.85rem 1rem 0.75rem;
+        background: #fff;
+        cursor: pointer;
+      }
+      .messages-table tbody tr.message-row:hover { background: #f9fafb; }
+      .messages-table tbody tr.message-row.unread {
+        border-color: #bfdbfe;
+        background: #f8fbff;
+      }
+      .messages-table tbody tr.message-row.unread:hover { background: #eff6ff; }
+      .messages-table tbody td {
+        border: none;
+        padding: 0;
+      }
+      .messages-table .cell-from {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.5rem;
+        margin-bottom: 0.35rem;
+        font-size: 0.95rem;
+      }
+      .messages-table .cell-preview {
+        margin-bottom: 0.65rem;
+      }
+      .messages-table .cell-preview .preview {
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.45;
+        font-size: 0.875rem;
+      }
+      .messages-table .cell-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem 1rem;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        font-size: 0.8rem;
+        color: var(--shell-muted);
+      }
+      .messages-table .cell-received,
+      .messages-table .cell-duration {
+        display: none;
+      }
+      .messages-table .cell-actions {
+        margin-top: 0.15rem;
+      }
+      .messages-table .cell-actions .btn {
+        width: 100%;
+        justify-content: center;
+      }
+      .messages-table .cell-actions .btn-desktop-only { display: none; }
+    }
+    @media (min-width: 641px) {
+      .messages-table .cell-meta { display: none; }
+      .messages-table .cell-received,
+      .messages-table .cell-duration { display: table-cell; }
+      .messages-table .cell-actions .btn-mobile-only { display: none; }
     }
   </style>
 </head>
@@ -64,7 +210,9 @@
       <h1>Call Center</h1>
       <nav class="app-nav">
         <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if request.endpoint == 'admin.dashboard' }}">Dashboard</a>
-        <a href="{{ url_for('admin.messages') }}" class="{{ 'active' if request.endpoint in ['admin.messages', 'admin.message_detail'] }}">Messages</a>
+        <a href="{{ url_for('admin.messages') }}" class="{{ 'active' if request.endpoint in ['admin.messages', 'admin.message_detail'] }}">Messages{% if unread_count %} <span class="badge badge-unread">{{ unread_count }}</span>{% endif %}</a>
+        <a href="{{ url_for('admin.contacts') }}" class="{{ 'active' if request.endpoint in ['admin.contacts', 'admin.contact_new', 'admin.contact_edit'] }}">Contacts</a>
+        <a href="{{ url_for('admin.blocked') }}" class="{{ 'active' if request.endpoint in ['admin.blocked', 'admin.blocked_new', 'admin.blocked_edit'] }}">Blocklist</a>
         <a href="{{ url_for('admin.settings') }}" class="{{ 'active' if request.endpoint == 'admin.settings' }}">Settings</a>
         <a href="{{ url_for('admin.connection') }}" class="{{ 'active' if request.endpoint in ['admin.connection', 'admin.connection_test'] }}">Connection</a>
         {% if logout_form %}

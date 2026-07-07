@@ -31,6 +31,10 @@ pytest --cov=app --cov-report=term-missing
 | Twilio signature auth | `tests/test_twilio_auth.py` |
 | IVR menu/routing | `tests/test_ivr.py` |
 | Voicemail callback | `tests/test_voicemail_callback.py` |
+| Voicemail transcription (Twilio callbacks) | `tests/test_transcription.py` |
+| Schema migrations | `tests/test_db_migrations.py` |
+| Read / unread | `tests/test_read_unread.py` |
+| Contacts + phone normalization | `tests/test_contacts.py` |
 | Admin auth | `tests/test_admin_auth.py` |
 | CSRF | `tests/test_admin_csrf.py` |
 | Login rate limiting | `tests/test_admin_rate_limit.py` |
@@ -40,6 +44,8 @@ pytest --cov=app --cov-report=term-missing
 | Admin messages CRUD | `tests/test_admin_messages.py` |
 | Settings + IVR integration | `tests/test_settings.py`, `tests/test_voicemail_settings.py` |
 | Connection diagnostics | `tests/test_connection_diagnostics.py` |
+| SMS notifications (unit) | `tests/test_notify.py` |
+| SMS notifications (admin UI) | `tests/test_admin_notifications.py` |
 | Static assets | `tests/test_static_basecoat.py` |
 
 ## Manual checkpoints by phase
@@ -82,14 +88,46 @@ Complete each phase's checks before moving on.
 - [ ] Over-limit settings submitted via curl are rejected server-side
 - [ ] Settings survive a container restart
 
+### Phase 4a — SMS notifications
+
+- [ ] Adding recipients on the Settings page saves; an invalid number is rejected
+- [ ] Connection page shows ON with the correct masked recipient count
+- [ ] "Send test SMS" delivers a message to each configured number
+- [ ] Leaving a voicemail texts each recipient a link to `/admin/messages/<id>`
+- [ ] With no recipients configured, voicemail still saves and the callback returns 204
+
+### Phase 4b — Voicemail transcription
+
+- [ ] With transcription off (default), `/voicemail` TwiML has no `transcribe` attribute
+- [ ] Enabling transcription on Settings adds `transcribe="true"` and caps `maxLength` at 120
+- [ ] Leaving a voicemail (>2s) produces a transcript on the message a few seconds later
+- [ ] The transcript is searchable from the Messages search box
+- [ ] Twilio Console → Monitor → Logs shows no `13257` transcribeCallback errors
+- [ ] With transcription off, the recording is still deleted from Twilio immediately
+
+### Phase 4c — Read / unread
+
+- [ ] A new voicemail shows as unread (bold + "New" badge) with an unread count
+- [ ] Opening a message clears its unread state
+- [ ] "Mark all read" clears all badges; "Unread only" filters the list
+- [ ] The dashboard and Messages nav show the correct unread count
+
+### Phase 4d — Contacts
+
+- [ ] Adding a contact makes its name appear wherever that caller ID is shown
+- [ ] A bare 10-digit number is stored as +1 E.164; junk input is rejected
+- [ ] CSV import adds/updates contacts and reports skipped invalid rows
+- [ ] Deleting a contact reverts the caller ID back to the raw number
+
 ### Phase 5 — Basecoat UI
 
 Check each page at desktop and mobile widths:
 
 - [ ] Login: styled card/button; error alert styled
 - [ ] Dashboard: nav visible; cards readable
-- [ ] Messages: table and buttons styled; pagination works
-- [ ] Message detail: audio player and delete work
+- [ ] Messages: table and buttons styled; pagination works; unread rows bold
+- [ ] Message detail: transcript, audio player, and delete work
+- [ ] Contacts: list, add/edit/delete, and CSV import styled and working
 - [ ] Settings: inputs aligned; save shows a flash; HTML5 limits enforced
 - [ ] Connection: run tests works; badges readable; URLs copy; no secrets shown
 - [ ] No 404s for static assets; no unescaped user content in page source

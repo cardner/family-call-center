@@ -1,0 +1,37 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">{{ heading }}</h2>
+  <a class="btn btn-outline btn-sm" href="{{ url_for('admin.blocked') }}">← Back</a>
+</div>
+
+<div class="card">
+  <form method="post" data-trim>
+    {{ form.csrf_token }}
+
+    <div class="field">
+      <label class="label" for="phone">Phone number</label>
+      <input class="input" id="phone" name="phone" type="text" maxlength="32"
+             required value="{{ form.phone.data or '' }}" placeholder="+15551234567"
+             style="max-width:360px;" {{ 'readonly' if editing }} />
+      {% if editing %}
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">The number cannot be changed. Delete this entry and add a new one to block a different number.</p>
+      {% else %}
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">E.164 preferred (<code>+15551234567</code>). A bare 10-digit number is treated as US.</p>
+      {% endif %}
+      {% for error in form.phone.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="note">Note (optional)</label>
+      <input class="input" id="note" name="note" type="text" maxlength="200"
+             value="{{ form.note.data or '' }}" placeholder="robocaller, wrong number, …" style="max-width:360px;" />
+      {% for error in form.note.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <button type="submit" class="btn">Save</button>
+  </form>
+</div>
+{% endblock %}

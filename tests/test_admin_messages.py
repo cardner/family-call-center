@@ -16,6 +16,43 @@ def test_detail_page_renders(auth_client, sample_recording):
     assert resp.status_code == 200
 
 
+def test_transcript_shown_in_list(auth_client, sample_recording):
+    sample_recording(
+        caller_id="+15551112222",
+        transcript="please call the doctor",
+        transcript_status="complete",
+    )
+    resp = auth_client.get("/admin/messages")
+    assert b"please call the doctor" in resp.data
+
+
+def test_transcript_shown_in_detail(auth_client, sample_recording):
+    rec = sample_recording(
+        transcript="hello world transcript",
+        transcript_status="complete",
+    )
+    resp = auth_client.get(f"/admin/messages/{rec['id']}")
+    assert b"hello world transcript" in resp.data
+
+
+def test_search_by_transcript(auth_client, sample_recording):
+    sample_recording(
+        caller_id="+15551112222",
+        name="a.wav",
+        transcript="pickup groceries",
+        transcript_status="complete",
+    )
+    sample_recording(
+        caller_id="+15553334444",
+        name="b.wav",
+        transcript="dentist appointment",
+        transcript_status="complete",
+    )
+    resp = auth_client.get("/admin/messages?q=groceries")
+    assert b"+15551112222" in resp.data
+    assert b"+15553334444" not in resp.data
+
+
 def test_audio_returns_wav(auth_client, sample_recording):
     rec = sample_recording()
     resp = auth_client.get(f"/admin/messages/{rec['id']}/audio")
