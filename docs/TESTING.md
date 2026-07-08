@@ -30,6 +30,7 @@ pytest --cov=app --cov-report=term-missing
 | Health | `tests/test_health.py` |
 | Twilio signature auth | `tests/test_twilio_auth.py` |
 | IVR menu/routing | `tests/test_ivr.py` |
+| Voicemail boxes | `tests/test_boxes.py` |
 | Call policy (blocklist + VIP) | `tests/test_call_policy.py` |
 | Personalized greetings | `tests/test_greeting.py` |
 | Voicemail callback | `tests/test_voicemail_callback.py` |
@@ -125,14 +126,21 @@ Complete each phase's checks before moving on.
 - [ ] A bare 10-digit number is stored as +1 E.164; junk input is rejected
 - [ ] CSV import adds/updates contacts and reports skipped invalid rows
 - [ ] Deleting a contact reverts the caller ID back to the raw number
-- [ ] VIP contact ("Skip menu") goes straight to voicemail on a test call
+- [ ] VIP contact still hears the main menu and can pick a mailbox on a test call
+
+### Phase 4d.1 — Voicemail boxes
+
+- [ ] The main menu lists "press N" options for each enabled box (Family/Cody/Ryan/Cory)
+- [ ] Pressing 1–4 starts recording for the matching box; the message shows that box in the inbox
+- [ ] A box's own prompt/thank-you/SMS recipients are used; a blank box inherits the Settings defaults
+- [ ] Disabling a box removes it from the menu and its digit replays the menu
+- [ ] The inbox box filter narrows messages to the selected mailbox
 
 ### Phase 4e — Personalized greetings
 
 - [ ] Enabling personalized greetings on Settings saves correctly
 - [ ] Known contact hears their name in the main menu greeting (auto-prefix or `{name}` token)
-- [ ] Known contact hears their name in the voicemail prompt
-- [ ] VIP contact hears personalized voicemail prompt without hearing the main menu
+- [ ] Known contact hears their name in the voicemail prompt of the box they pick
 - [ ] Unknown caller hears the normal greeting with no awkward "Hi ." phrasing
 - [ ] With the toggle off, greetings are unchanged even if `{name}` is in the text
 
@@ -141,7 +149,7 @@ Complete each phase's checks before moving on.
 - [ ] Adding a blocked number stops that caller from reaching the menu
 - [ ] "Reject" setting gives a busy signal; "Play a message" speaks the prompt and hangs up
 - [ ] Blocking a caller from a message detail page adds them to the blocklist
-- [ ] VIP contact who is also blocked is still allowed through to voicemail
+- [ ] VIP contact who is also blocked is still allowed through to the menu
 - [ ] Starter blocklist import adds numbers; bulk-remove only deletes imported entries
 
 ### Phase 5 — Basecoat UI

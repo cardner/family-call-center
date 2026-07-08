@@ -23,7 +23,7 @@
     {% if connection_summary %}
       <p style="margin:0.5rem 0 0;">
         <span class="badge badge-{{ connection_summary.overall }}">{{ connection_summary.overall | upper }}</span>
-        <span class="muted" style="font-size:0.8rem;">as of {{ connection_summary.tested_at }}</span>
+        <span class="muted" style="font-size:0.8rem;">as of <time datetime="{{ connection_summary.tested_at }}">{{ format_recorded_at(connection_summary.tested_at) }}</time></span>
       </p>
     {% else %}
       <p class="muted" style="margin:0.5rem 0 0;">Not tested yet.</p>
@@ -68,7 +68,7 @@
             <span>{{ caller_label(r['caller_id']) }}</span>
           </td>
           <td class="cell-meta" aria-hidden="true">
-            <span>{{ format_recorded_at(r['created_at']) }}</span>
+            <time datetime="{{ r['created_at'] }}">{{ format_recorded_at(r['created_at']) }}</time>
             <span>{{ r['duration'] }}s</span>
           </td>
           <td class="cell-received">

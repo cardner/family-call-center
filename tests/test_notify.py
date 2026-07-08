@@ -48,6 +48,11 @@ def test_format_sms_body_includes_link():
     assert "/admin/messages/123" in body
 
 
+def test_format_sms_body_includes_box_name():
+    body = notify.format_sms_body("+15551234567", 42, 123, box_name="Cody")
+    assert "for Cody" in body
+
+
 def test_mask_phone_keeps_last_four():
     assert notify.mask_phone("+15551234567") == "…4567"
 
@@ -107,3 +112,39 @@ def test_send_test_notification(app):
     results = notify.send_test_notification(client_factory=lambda: fake)
     assert results[0]["status"] == "sent"
     assert len(fake.messages.sent) == 1
+
+
+def test_notify_new_message_uses_box_recipients(app):
+    from app.utils.boxes import get_box_by_slug, update_box
+
+    set_setting("notify_phone_numbers", "+15550000000")
+    cody = get_box_by_slug("cody")
+    update_box(cody["id"], notify_phone_numbers="+15551112222")
+    fake = _FakeClient()
+    results = notify.notify_new_message(
+        message_id=1,
+        caller_id="+15559998888",
+        duration=8,
+        box=get_box_by_slug("cody"),
+        client_factory=lambda: fake,
+    )
+    assert [r["status"] for r in results] == ["sent"]
+    # The box's own recipient is used, not the global list.
+    assert fake.messages.sent[0]["to"] == "+15551112222"
+    assert "for Cody" in fake.messages.sent[0]["body"]
+
+
+def test_notify_new_message_box_falls_back_to_global(app):
+    from app.utils.boxes import get_box_by_slug
+
+    set_setting("notify_phone_numbers", "+15550000000")
+    fake = _FakeClient()
+    # A box with no recipients of its own inherits the global list.
+    notify.notify_new_message(
+        message_id=1,
+        caller_id="+15559998888",
+        duration=8,
+        box=get_box_by_slug("ryan"),
+        client_factory=lambda: fake,
+    )
+    assert fake.messages.sent[0]["to"] == "+15550000000"

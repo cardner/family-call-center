@@ -16,17 +16,20 @@ messages and IVR prompts, and an automated test suite.
 ### Call handling (Twilio IVR)
 
 - **Voicemail IVR** — Twilio voice webhooks with request-signature verification.
-- **Configurable prompts** — main menu greeting, invalid-input message, voicemail
-  prompt, and thank-you message stored in SQLite and editable from the admin UI
-  (no redeploy needed).
+- **Per-recipient voicemail boxes** — a single menu routes callers to one of four
+  mailboxes (Family, Cody, Ryan, Cory) by keypad digit, each with its own optional
+  prompt, thank-you message, and SMS recipients, and its own inbox filter.
+- **Configurable prompts** — main menu greeting, invalid-input message, and default
+  voicemail prompt/thank-you message stored in SQLite and editable from the admin UI
+  (no redeploy needed). The menu's "press N" options are generated from your boxes.
 - **Neural TTS + SSML** — Google Neural2 voices (via Twilio) with optional SSML
   tags for pauses, emphasis, and prosody.
 - **Personalized greetings** — optional toggle looks up the caller in your contacts
   and speaks their name in the main menu greeting and voicemail prompt. Supports a
   `{name}` placeholder or automatic salutation prefixes (`Hi {name}` / `Thanks for
   calling {name}`).
-- **VIP contacts** — per-contact flag to skip the main menu and go straight to
-  voicemail (VIP always wins over the blocklist).
+- **VIP contacts** — per-contact flag that lets a caller bypass the blocklist (VIP
+  always wins over the blocklist); VIPs still pick a mailbox from the menu.
 - **Blocklist** — reject or play a message to blocked callers before they reach
   the menu or voicemail. Manage numbers manually, block from a message detail
   page, or import a starter list from the community [CallShield](https://github.com/SysAdminDoc/CallShield)
@@ -38,7 +41,9 @@ messages and IVR prompts, and an automated test suite.
 - **Dashboard** — message count, unread count, SMS notification status, last
   connection-test result.
 - **Messages inbox** — paginated list with search (caller ID, transcript, contact
-  name), audio playback, delete, and read/unread tracking.
+  name), per-box filtering, audio playback, delete, and read/unread tracking.
+- **Voicemail boxes** — edit each mailbox's prompt, thank-you message, menu digit,
+  and SMS recipients.
 - **Contacts** — phone → display name address book with CSV import.
 - **Blocklist** — manage blocked numbers and optional CallShield starter import.
 - **Settings** — edit prompts, IVR voice, max recording length, transcription,
@@ -232,11 +237,11 @@ US A2P 10DLC), then add recipient numbers on the admin Settings page.
 
 | Endpoint | Purpose |
 |----------|---------|
-| `/call` | Main menu — VIP skip, blocklist check, personalized greeting |
-| `/call/route` | Keypad routing (1 → voicemail) |
-| `/voicemail` | Voicemail prompt + start recording |
+| `/call` | Main menu — VIP blocklist bypass, blocklist check, personalized greeting |
+| `/call/route` | Keypad routing (1–4 → the chosen voicemail box) |
+| `/voicemail` | Voicemail prompt + start recording (per `?box=` slug) |
 | `/voicemail/done` | Thank caller and hang up |
-| `/voicemail/callback` | Save recording locally, notify via SMS |
+| `/voicemail/callback` | Save recording (tagged with its box) locally, notify via SMS |
 | `/voicemail/transcribe` | Store transcript (when transcription enabled) |
 
 ### Public
@@ -267,8 +272,9 @@ app/
     auth.py              # session login/logout, timeouts
     db.py                # SQLite schema and CRUD
     settings.py          # editable IVR settings
+    boxes.py             # per-recipient voicemail boxes
     greeting.py          # personalized greeting/voicemail prompt formatting
-    call_policy.py       # blocklist + VIP skip logic
+    call_policy.py       # blocklist + VIP logic
     contacts.py          # caller ID → display name resolution
     blocklist_import.py  # CallShield starter import
     twiml.py             # TwiML builders

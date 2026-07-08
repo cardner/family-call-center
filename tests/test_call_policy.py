@@ -1,4 +1,4 @@
-from app.utils.call_policy import is_blocked, normalize_caller_id, should_skip_ivr_menu
+from app.utils.call_policy import is_blocked, is_vip_contact, normalize_caller_id
 from app.utils.db import upsert_blocked, upsert_contact
 
 
@@ -34,17 +34,17 @@ def test_is_blocked_ignores_private_caller(app):
     assert is_blocked("anonymous") is False
 
 
-def test_should_skip_ivr_menu_for_vip_contact(app):
-    upsert_contact("+15551112222", "Mom", skip_ivr_menu=True)
-    assert should_skip_ivr_menu("+15551112222") is True
+def test_is_vip_contact_for_vip(app):
+    upsert_contact("+15551112222", "Mom", is_vip=True)
+    assert is_vip_contact("+15551112222") is True
     # Tail match works too.
-    assert should_skip_ivr_menu("5551112222") is True
+    assert is_vip_contact("5551112222") is True
 
 
-def test_should_skip_ivr_menu_false_for_normal_contact(app):
+def test_is_vip_contact_false_for_normal_contact(app):
     upsert_contact("+15551112222", "Mom")
-    assert should_skip_ivr_menu("+15551112222") is False
+    assert is_vip_contact("+15551112222") is False
 
 
-def test_should_skip_ivr_menu_false_for_unknown_caller(app):
-    assert should_skip_ivr_menu("+15550009999") is False
+def test_is_vip_contact_false_for_unknown_caller(app):
+    assert is_vip_contact("+15550009999") is False

@@ -19,6 +19,7 @@ from app.extensions import limiter
 from app.forms.admin_forms import (
     BlockCallerForm,
     BlockedNumberForm,
+    BoxForm,
     ConnectionTestForm,
     ContactForm,
     ContactsImportForm,
@@ -33,6 +34,7 @@ from app.forms.admin_forms import (
     SettingsForm,
 )
 from app.utils.auth import login_required, login_user, logout_user, verify_credentials
+from app.utils.boxes import get_box, get_box_by_slug, list_boxes, update_box
 from app.utils.blocklist_import import (
     SEED_SOURCE,
     BlocklistImportError,
@@ -132,14 +134,23 @@ def messages():
     query = sanitize_text(request.args.get("q", ""), max_length=64) or None
     unread_only = request.args.get("unread") == "1"
 
-    total = count_recordings(search=query, unread_only=unread_only)
+    boxes = list_boxes()
+    box_slug = sanitize_text(request.args.get("box", ""), max_length=32) or None
+    selected_box = get_box_by_slug(box_slug) if box_slug else None
+    box_id = selected_box["id"] if selected_box else None
+
+    total = count_recordings(search=query, unread_only=unread_only, box_id=box_id)
     total_pages = max(1, math.ceil(total / per_page)) if total else 1
     if page > total_pages:
         page = total_pages
     offset = (page - 1) * per_page
 
     rows = list_recordings(
-        limit=per_page, offset=offset, search=query, unread_only=unread_only
+        limit=per_page,
+        offset=offset,
+        search=query,
+        unread_only=unread_only,
+        box_id=box_id,
     )
 
     return render_template(
@@ -151,6 +162,8 @@ def messages():
         total_pages=total_pages,
         query=query or "",
         unread_only=unread_only,
+        boxes=boxes,
+        box_filter=selected_box["slug"] if selected_box else "",
         mark_all_read_form=MarkAllReadForm(),
         logout_form=LogoutForm(),
     )
@@ -179,9 +192,11 @@ def message_detail(message_id):
         abort(404)
     # Opening a message marks it read.
     mark_recording_read(message_id)
+    box = get_box(row["box_id"]) if row["box_id"] else None
     return render_template(
         "admin/message_detail.html",
         recording=row,
+        box=box,
         delete_form=DeleteMessageForm(),
         block_form=BlockCallerForm(),
         caller_blocked=is_blocked(row["caller_id"]),
@@ -287,6 +302,72 @@ def settings():
     )
 
 
+@admin_bp.get("/boxes")
+@login_required
+def boxes():
+    return render_template(
+        "admin/boxes.html",
+        boxes=list_boxes(),
+        logout_form=LogoutForm(),
+    )
+
+
+@admin_bp.route("/boxes/<int:box_id>/edit", methods=["GET", "POST"])
+@login_required
+def box_edit(box_id):
+    row = get_box(box_id)
+    if row is None:
+        abort(404)
+
+    form = BoxForm()
+    if form.validate_on_submit():
+        digit = form.extension_digit.data
+        # Menu digits must be unique so a keypress maps to exactly one box.
+        clash = next(
+            (
+                b
+                for b in list_boxes()
+                if b["extension_digit"] == digit and b["id"] != box_id
+            ),
+            None,
+        )
+        if clash is not None:
+            flash(
+                f"Digit {digit} is already used by {clash['display_name']}.", "error"
+            )
+        else:
+            update_box(
+                box_id,
+                display_name=sanitize_text(form.display_name.data, 120),
+                extension_digit=digit,
+                voicemail_prompt=sanitize_ivr_text(form.voicemail_prompt.data or ""),
+                voicemail_thanks=sanitize_ivr_text(form.voicemail_thanks.data or ""),
+                notify_phone_numbers=",".join(
+                    parse_phone_numbers(form.notify_phone_numbers.data)
+                ),
+                enabled=1 if form.enabled.data else 0,
+            )
+            flash("Voicemail box saved.", "success")
+            return redirect(url_for("admin.boxes"))
+
+    if request.method == "GET":
+        form.display_name.data = row["display_name"]
+        form.extension_digit.data = row["extension_digit"]
+        form.voicemail_prompt.data = row["voicemail_prompt"]
+        form.voicemail_thanks.data = row["voicemail_thanks"]
+        form.notify_phone_numbers.data = "\n".join(
+            parse_phone_numbers(row["notify_phone_numbers"])
+        )
+        form.enabled.data = bool(row["enabled"])
+
+    return render_template(
+        "admin/box_form.html",
+        form=form,
+        box=row,
+        logout_form=LogoutForm(),
+    )
+
+
 @admin_bp.get("/connection")
 @login_required
 def connection():
@@ -313,7 +394,7 @@ def connection_test():
     results = run_all_checks()
     session["connection_summary"] = {
         "overall": results["overall"],
-        "tested_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "tested_at": datetime.now(timezone.utc).isoformat(),
     }
 
     return render_template(
@@ -391,7 +472,7 @@ def contact_new():
         upsert_contact(
             form.phone.data,
             sanitize_text(form.display_name.data, 120),
-            skip_ivr_menu=form.skip_ivr_menu.data,
+            is_vip=form.is_vip.data,
         )
         flash("Contact saved.", "success")
         return redirect(url_for("admin.contacts"))
@@ -416,7 +497,7 @@ def contact_edit(contact_id):
         upsert_contact(
             form.phone.data,
             sanitize_text(form.display_name.data, 120),
-            skip_ivr_menu=form.skip_ivr_menu.data,
+            is_vip=form.is_vip.data,
         )
         flash("Contact saved.", "success")
         return redirect(url_for("admin.contacts"))
@@ -424,7 +505,7 @@ def contact_edit(contact_id):
     if request.method == "GET":
         form.phone.data = row["phone"]
         form.display_name.data = row["display_name"]
-        form.skip_ivr_menu.data = bool(row["skip_ivr_menu"])
+        form.is_vip.data = bool(row["is_vip"])
 
     return render_template(
         "admin/contact_form.html",

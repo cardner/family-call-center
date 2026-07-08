@@ -37,11 +37,14 @@ def _reset_db():
         conn.execute("DELETE FROM settings")
         conn.execute("DELETE FROM contacts")
         conn.execute("DELETE FROM blocked_numbers")
+        conn.execute("DELETE FROM voicemail_boxes")
         conn.commit()
-    # Re-seed default settings after wiping.
+    # Re-seed default settings and the four voicemail boxes after wiping.
+    from app.utils.boxes import seed_default_boxes
     from app.utils.settings import seed_default_settings
 
     seed_default_settings()
+    seed_default_boxes()
 
 
 def _make_app(csrf_enabled=False, ratelimit_enabled=False):

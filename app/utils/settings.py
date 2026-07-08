@@ -32,13 +32,9 @@ _E164_RE = re.compile(r"^\+[1-9]\d{6,14}$")
 BLOCK_ACTIONS = ("reject", "message")
 
 DEFAULT_SETTINGS = {
-    "greeting": (
-        'Welcome. <break time="300ms"/> '
-        'To leave a voicemail, <emphasis level="moderate">press 1</emphasis>.'
-    ),
+    "greeting": 'Welcome. <break time="300ms"/>',
     "invalid_digit_message": (
-        'I didn\'t catch that. <break time="200ms"/> '
-        '<emphasis level="moderate">Press 1</emphasis> to leave a voicemail.'
+        "I didn't catch that. <break time=\"200ms\"/> Please try again."
     ),
     "voicemail_prompt": (
         "Please leave your message after the beep. <break time=\"300ms\"/> "

@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/basecoat/basecoat.css') }}" />
   <script src="{{ url_for('static', filename='vendor/basecoat/all.js') }}" defer></script>
   <script src="{{ url_for('static', filename='admin/forms.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='admin/local-time.js') }}" defer></script>
   <style>
     :root { --shell-border: #e5e7eb; --shell-muted: #6b7280; }
     * { box-sizing: border-box; }
@@ -139,8 +140,8 @@
       .app-main { padding: 1rem; }
       .app-topbar { flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
       .messages-toolbar { flex-direction: column; align-items: stretch; }
-      .messages-search { flex-direction: column; align-items: stretch; width: 100%; }
-      .messages-search .input { max-width: none; }
+      .messages-search { flex-direction: column; align-items: stretch; width: 100%; flex: none; }
+      .messages-search .input { max-width: none; flex: none; }
       .messages-filters { justify-content: stretch; }
       .messages-filters form { flex: 1 1 auto; }
       .messages-filters .btn { flex: 1 1 auto; justify-content: center; }
@@ -240,6 +241,7 @@
       <nav class="app-nav">
         <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if request.endpoint == 'admin.dashboard' }}">Dashboard</a>
         <a href="{{ url_for('admin.messages') }}" class="{{ 'active' if request.endpoint in ['admin.messages', 'admin.message_detail'] }}">Messages{% if unread_count %} <span class="badge badge-unread">{{ unread_count }}</span>{% endif %}</a>
+        <a href="{{ url_for('admin.boxes') }}" class="{{ 'active' if request.endpoint in ['admin.boxes', 'admin.box_edit'] }}">Voicemail boxes</a>
         <a href="{{ url_for('admin.contacts') }}" class="{{ 'active' if request.endpoint in ['admin.contacts', 'admin.contact_new', 'admin.contact_edit'] }}">Contacts</a>
         <a href="{{ url_for('admin.blocked') }}" class="{{ 'active' if request.endpoint in ['admin.blocked', 'admin.blocked_new', 'admin.blocked_edit'] }}">Blocklist</a>
         <a href="{{ url_for('admin.settings') }}" class="{{ 'active' if request.endpoint == 'admin.settings' }}">Settings</a>

@@ -15,10 +15,22 @@
     <button class="btn btn-outline" type="submit">Search</button>
   </form>
   <div class="messages-filters">
+    {% if boxes %}
+    <form method="get" action="{{ url_for('admin.messages') }}">
+      {% if query %}<input type="hidden" name="q" value="{{ query }}" />{% endif %}
+      {% if unread_only %}<input type="hidden" name="unread" value="1" />{% endif %}
+      <select class="input" name="box" onchange="this.form.submit()" style="width:auto;">
+        <option value="">All boxes</option>
+        {% for b in boxes %}
+        <option value="{{ b['slug'] }}" {{ 'selected' if box_filter == b['slug'] }}>{{ b['display_name'] }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
     {% if unread_only %}
-      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', q=query or None) }}">Show all</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', q=query or None, box=box_filter or None) }}">Show all</a>
     {% else %}
-      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', unread=1, q=query or None) }}">Unread only</a>
+      <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', unread=1, q=query or None, box=box_filter or None) }}">Unread only</a>
     {% endif %}
     <form method="post" action="{{ url_for('admin.messages_mark_all_read') }}">
       {{ mark_all_read_form.csrf_token }}
@@ -47,6 +59,7 @@
           <td class="cell-from">
             {% if not r['read_at'] %}<span class="badge badge-new">New</span>{% endif %}
             <span>{{ caller_label(r['caller_id']) }}</span>
+            {% if r['box_name'] %}<span class="badge badge-info">{{ r['box_name'] }}</span>{% endif %}
           </td>
           <td class="cell-preview">
             {% if r['transcript_status'] == 'complete' and r['transcript'] %}
@@ -60,7 +73,7 @@
             {% endif %}
           </td>
           <td class="cell-meta" aria-hidden="true">
-            <span>{{ format_recorded_at(r['created_at']) }}</span>
+            <time datetime="{{ r['created_at'] }}">{{ format_recorded_at(r['created_at']) }}</time>
             <span>{{ r['duration'] }}s</span>
           </td>
           <td class="cell-received">
@@ -85,11 +98,11 @@
 {% if total_pages > 1 %}
 <div class="messages-pagination">
   {% if page > 1 %}
-    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page-1, per_page=per_page, q=query or None, unread=1 if unread_only else None) }}">Previous</a>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page-1, per_page=per_page, q=query or None, unread=1 if unread_only else None, box=box_filter or None) }}">Previous</a>
   {% endif %}
   <span class="muted">Page {{ page }} of {{ total_pages }}</span>
   {% if page < total_pages %}
-    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page+1, per_page=per_page, q=query or None, unread=1 if unread_only else None) }}">Next</a>
+    <a class="btn btn-outline btn-sm" href="{{ url_for('admin.messages', page=page+1, per_page=per_page, q=query or None, unread=1 if unread_only else None, box=box_filter or None) }}">Next</a>
   {% endif %}
 </div>
 {% endif %}

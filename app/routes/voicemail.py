@@ -9,6 +9,7 @@ from flask import Blueprint, request
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse
 
+from app.utils.boxes import get_box_by_slug, get_default_box
 from app.utils.db import (
     get_recording_by_twilio_sid,
     init_db,
@@ -59,8 +60,17 @@ def voicemail():
     """
     try:
         caller_id = sanitize_text(request.form.get("From", ""), max_length=32)
-        caller_query = f"?{urlencode({'caller': caller_id})}" if caller_id else ""
-        callback_url = f"{Config.BASE_URL}/voicemail/callback{caller_query}"
+        box = get_box_by_slug(request.args.get("box", "")) or get_default_box()
+        box_slug = box["slug"] if box else None
+
+        params = {}
+        if caller_id:
+            params["caller"] = caller_id
+        if box_slug:
+            params["box"] = box_slug
+        query = f"?{urlencode(params)}" if params else ""
+        done_query = f"?{urlencode({'box': box_slug})}" if box_slug else ""
+        callback_url = f"{Config.BASE_URL}/voicemail/callback{query}"
 
         transcribe = is_transcription_enabled()
         # Twilio only transcribes recordings shorter than 120s, so clamp the max
@@ -70,7 +80,7 @@ def voicemail():
             max_length = min(max_length, TRANSCRIPTION_MAX_RECORDING_SECONDS)
 
         record_kwargs = {
-            "action": f"{Config.BASE_URL}/voicemail/done",
+            "action": f"{Config.BASE_URL}/voicemail/done{done_query}",
             "recording_status_callback": callback_url,
             "recording_status_callback_method": "POST",
             "finish_on_key": "#",
@@ -80,11 +90,11 @@ def voicemail():
         if transcribe:
             record_kwargs["transcribe"] = True
             record_kwargs["transcribe_callback"] = (
-                f"{Config.BASE_URL}/voicemail/transcribe{caller_query}"
+                f"{Config.BASE_URL}/voicemail/transcribe{query}"
             )
 
         vr = VoiceResponse()
-        say_prompt(vr, format_voicemail_prompt(caller_id))
+        say_prompt(vr, format_voicemail_prompt(caller_id, box))
         vr.record(**record_kwargs)
         return twiml_response(vr)
     except Exception:
@@ -97,8 +107,12 @@ def voicemail():
 def voicemail_done():
     """Thank the caller and end the call after recording."""
     try:
+        box = get_box_by_slug(request.args.get("box", "")) or get_default_box()
+        thanks = (box["voicemail_thanks"] if box else "") or get_setting(
+            "voicemail_thanks"
+        )
         vr = VoiceResponse()
-        say_prompt(vr, get_setting("voicemail_thanks"))
+        say_prompt(vr, thanks)
         vr.hangup()
         return twiml_response(vr)
     except Exception:
@@ -124,6 +138,8 @@ def voicemail_callback():
         request.args.get("caller") or request.form.get("From") or "unknown",
         max_length=32,
     )
+    box = get_box_by_slug(request.args.get("box", "")) or get_default_box()
+    box_id = box["id"] if box else None
     duration = parse_positive_int(
         request.form.get("RecordingDuration", "0"),
         min_value=0,
@@ -182,14 +198,16 @@ def voicemail_callback():
             file_size=file_size,
             twilio_sid=recording_sid,
             transcript_status="pending" if transcribe else "disabled",
+            box_id=box_id,
         )
 
-        # Best-effort SMS alert to configured recipients; never fatal.
+        # Best-effort SMS alert to the box's recipients; never fatal.
         notify_new_message(
             message_id=message_id,
             caller_id=caller_id,
             duration=duration,
             created_at=now.isoformat(),
+            box=box,
         )
 
         # When transcription is on, keep the recording on Twilio until the

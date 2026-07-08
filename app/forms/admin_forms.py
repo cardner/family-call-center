@@ -117,6 +117,48 @@ class SettingsForm(FlaskForm):
             )
 
 
+class BoxForm(FlaskForm):
+    """Edit a single voicemail box (Family, Cody, Ryan, Cory)."""
+
+    display_name = StringField(
+        "Display name",
+        validators=[DataRequired(), Length(max=CONTACT_NAME_MAX_LENGTH)],
+    )
+    extension_digit = SelectField(
+        "Menu digit",
+        choices=[(str(n), str(n)) for n in range(1, 10)],
+        validators=[DataRequired()],
+    )
+    voicemail_prompt = TextAreaField(
+        "Voicemail prompt",
+        validators=[Optional(), Length(max=IVR_TEXT_MAX_LENGTH)],
+    )
+    voicemail_thanks = TextAreaField(
+        "Thank-you message",
+        validators=[Optional(), Length(max=IVR_TEXT_MAX_LENGTH)],
+    )
+    notify_phone_numbers = TextAreaField(
+        "SMS notification recipients",
+        validators=[Optional(), Length(max=NOTIFY_PHONE_NUMBERS_MAX_LENGTH)],
+    )
+    enabled = BooleanField("Enabled")
+    submit = SubmitField("Save box")
+
+    def validate_notify_phone_numbers(self, field):
+        """Reject the whole field if any entry is not valid E.164."""
+        invalid = [
+            number
+            for number in parse_phone_numbers(field.data)
+            if not is_valid_e164(number)
+        ]
+        if invalid:
+            raise ValidationError(
+                "Invalid phone number(s): "
+                + ", ".join(invalid)
+                + ". Use E.164 format, e.g. +15551234567."
+            )
+
+
 class DeleteMessageForm(FlaskForm):
     """CSRF-only form backing the delete button/confirm action."""
 
@@ -140,7 +182,7 @@ class ContactForm(FlaskForm):
         "Display name",
         validators=[DataRequired(), Length(max=CONTACT_NAME_MAX_LENGTH)],
     )
-    skip_ivr_menu = BooleanField("Skip the menu and go straight to voicemail")
+    is_vip = BooleanField("VIP contact (bypasses blocklist)")
     submit = SubmitField("Save contact")
 
     def validate_phone(self, field):

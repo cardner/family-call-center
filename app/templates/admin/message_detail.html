@@ -21,6 +21,7 @@
     <div><span class="label">Received</span><div><time datetime="{{ recording['created_at'] }}">{{ format_recorded_at(recording['created_at']) }}</time></div></div>
     <div><span class="label">Duration</span><div>{{ recording['duration'] }}s</div></div>
     <div><span class="label">Size</span><div>{{ (recording['file_size'] or 0) // 1024 }} KB</div></div>
+    {% if box %}<div><span class="label">Mailbox</span><div>{{ box['display_name'] }}</div></div>{% endif %}
   </div>
   <div>
     <span class="label">Transcript</span>

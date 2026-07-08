@@ -1,0 +1,29 @@
+{% extends "admin/base.html" %}
+{% block title %}Voicemail boxes{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Voicemail boxes</h2>
+</div>
+
+<p class="muted" style="margin-top:0;">Callers hear the main menu and press a digit to choose whose mailbox to leave a message in. Each box can have its own prompt, thank-you message, and SMS recipients; leave those blank to use the defaults from <a href="{{ url_for('admin.settings') }}">Settings</a>.</p>
+
+<div class="card">
+  <table>
+    <thead><tr><th>Box</th><th>Digit</th><th>Status</th><th>SMS alerts</th><th></th></tr></thead>
+    <tbody>
+      {% for b in boxes %}
+      <tr>
+        <td>{{ b['display_name'] }}</td>
+        <td>{{ b['extension_digit'] }}</td>
+        <td>{% if b['enabled'] %}<span class="badge badge-pass">Enabled</span>{% else %}<span class="badge badge-fail">Disabled</span>{% endif %}</td>
+        <td class="muted">{% if b['notify_phone_numbers'] %}Custom{% else %}Default{% endif %}</td>
+        <td class="row" style="gap:0.5rem; border:none;">
+          <a class="btn btn-outline btn-sm" href="{{ url_for('admin.box_edit', box_id=b['id']) }}">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

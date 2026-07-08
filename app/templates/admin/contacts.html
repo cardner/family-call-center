@@ -16,7 +16,7 @@
     <tbody>
       {% for c in contacts %}
       <tr>
-        <td>{{ c['display_name'] }}{% if c['skip_ivr_menu'] %} <span class="badge badge-info">Skips menu</span>{% endif %}</td>
+        <td>{{ c['display_name'] }}{% if c['is_vip'] %} <span class="badge badge-info">VIP</span>{% endif %}</td>
         <td>{{ c['phone'] }}</td>
         <td class="row" style="gap:0.5rem; border:none;">
           <a class="btn btn-outline btn-sm" href="{{ url_for('admin.contact_edit', contact_id=c['id']) }}">Edit</a>

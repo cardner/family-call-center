@@ -19,7 +19,7 @@
       <li><code>&lt;prosody rate="slow"&gt;slower text&lt;/prosody&gt;</code> — slower delivery (<code>slow</code>, <code>medium</code>, <code>fast</code>)</li>
     </ul>
     <p style="margin:0.5rem 0 0;">Example greeting:</p>
-    <pre class="muted" style="margin:0.25rem 0 0; white-space:pre-wrap;">Welcome. &lt;break time="300ms"/&gt; To leave a voicemail, &lt;emphasis level="moderate"&gt;press 1&lt;/emphasis&gt;.</pre>
+    <pre class="muted" style="margin:0.25rem 0 0; white-space:pre-wrap;">Welcome. &lt;break time="300ms"/&gt;</pre>
   </details>
   <form method="post" action="{{ url_for('admin.settings') }}" data-trim>
     {{ form.csrf_token }}
@@ -45,6 +45,7 @@
         <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="greeting">Preview</button>
       </div>
       <textarea class="input" id="greeting" name="greeting" rows="3" maxlength="500" required style="font-family:ui-monospace, monospace;">{{ form.greeting.data or '' }}</textarea>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">The intro played before the menu. The "press 1 for …" options are generated automatically from your <a href="{{ url_for('admin.boxes') }}">voicemail boxes</a>.</p>
       {% for error in form.greeting.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
@@ -54,7 +55,7 @@
                style="width:auto;" {{ 'checked' if form.personalized_greeting_enabled.data }} />
         Enable personalized greetings
       </label>
-      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When on, callers whose number matches a contact hear their name in the main menu greeting and voicemail prompt. Use <code>{name}</code> in either prompt to place the name yourself, or leave it out to automatically prepend <code>Hi {name}</code> (menu) or <code>Thanks for calling {name}</code> (voicemail). Callers not in your contacts hear the prompts unchanged. VIP contacts who skip the menu still get the personalized voicemail prompt.</p>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When on, callers whose number matches a contact hear their name in the main menu greeting and voicemail prompt. Use <code>{name}</code> in either prompt to place the name yourself, or leave it out to automatically prepend <code>Hi {name}</code> (menu) or <code>Thanks for calling {name}</code> (voicemail). Callers not in your contacts hear the prompts unchanged.</p>
     </div>
 
     <div class="field">
@@ -72,6 +73,7 @@
         <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="voicemail_prompt">Preview</button>
       </div>
       <textarea class="input" id="voicemail_prompt" name="voicemail_prompt" rows="4" maxlength="500" required style="font-family:ui-monospace, monospace;">{{ form.voicemail_prompt.data or '' }}</textarea>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Default prompt, thank-you, and SMS recipients below apply to any <a href="{{ url_for('admin.boxes') }}">voicemail box</a> that leaves them blank.</p>
       {% for error in form.voicemail_prompt.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 

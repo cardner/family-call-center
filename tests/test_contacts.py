@@ -110,25 +110,25 @@ def test_contact_name_used_in_inbox(auth_client, sample_recording):
     assert b"Grandma" in resp.data
 
 
-def test_contact_skip_ivr_menu_persists_on_create(auth_client):
+def test_contact_is_vip_persists_on_create(auth_client):
     resp = auth_client.post(
         "/admin/contacts/new",
-        data={"phone": "5551234567", "display_name": "Mom", "skip_ivr_menu": "y"},
+        data={"phone": "5551234567", "display_name": "Mom", "is_vip": "y"},
     )
     assert resp.status_code == 302
-    assert bool(get_contact_by_phone("+15551234567")["skip_ivr_menu"]) is True
+    assert bool(get_contact_by_phone("+15551234567")["is_vip"]) is True
 
 
-def test_contact_skip_ivr_menu_defaults_off(auth_client):
+def test_contact_is_vip_defaults_off(auth_client):
     auth_client.post(
         "/admin/contacts/new",
         data={"phone": "5551234567", "display_name": "Mom"},
     )
-    assert bool(get_contact_by_phone("+15551234567")["skip_ivr_menu"]) is False
+    assert bool(get_contact_by_phone("+15551234567")["is_vip"]) is False
 
 
-def test_contact_edit_updates_skip_ivr_menu(auth_client):
-    upsert_contact("+15551234567", "Mom", skip_ivr_menu=True)
+def test_contact_edit_updates_is_vip(auth_client):
+    upsert_contact("+15551234567", "Mom", is_vip=True)
     row = get_contact_by_phone("+15551234567")
     # Editing without the checkbox turns it off.
     resp = auth_client.post(
@@ -136,4 +136,4 @@ def test_contact_edit_updates_skip_ivr_menu(auth_client):
         data={"phone": "+15551234567", "display_name": "Mom"},
     )
     assert resp.status_code == 302
-    assert bool(get_contact_by_phone("+15551234567")["skip_ivr_menu"]) is False
+    assert bool(get_contact_by_phone("+15551234567")["is_vip"]) is False

@@ -27,12 +27,12 @@
     </div>
 
     <div class="field">
-      <label class="label" for="skip_ivr_menu" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
-        <input id="skip_ivr_menu" name="skip_ivr_menu" type="checkbox" value="y"
-               style="width:auto;" {{ 'checked' if form.skip_ivr_menu.data }} />
-        Skip the menu and go straight to voicemail
+      <label class="label" for="is_vip" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="is_vip" name="is_vip" type="checkbox" value="y"
+               style="width:auto;" {{ 'checked' if form.is_vip.data }} />
+        VIP contact (bypasses blocklist)
       </label>
-      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When this contact calls, they skip the "Press 1" menu and can leave a voicemail right away.</p>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">A VIP is always let through, even if their number is on the blocklist. They still hear the menu and choose which mailbox to leave a message for.</p>
     </div>
 
     <button type="submit" class="btn">Save contact</button>

@@ -29,10 +29,11 @@ def _format_time_12h(dt):
 
 
 def format_recorded_at(value, *, now=None, tz=None):
-    """Format an ISO UTC timestamp for the admin UI in local time.
+    """Format an ISO UTC timestamp for the admin UI.
 
     Examples: "Today 2:14 PM", "Yesterday 9:05 AM", "Jun 15 · 2:14 PM".
-    ``tz`` is for tests; production uses the host/container local timezone.
+    ``tz`` is for tests. In production the browser reformats ``<time>`` elements
+    in the viewer's timezone; this is the server-side fallback (noscript).
     """
     dt = parse_recorded_at(value)
     if dt is None:

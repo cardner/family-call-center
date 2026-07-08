@@ -31,14 +31,14 @@ def test_blocked_caller_message_action(client, twilio_post):
     assert b"<Gather" not in resp.data
 
 
-def test_vip_contact_skips_menu(client, twilio_post):
-    upsert_contact("+15551112222", "Mom", skip_ivr_menu=True)
+def test_vip_contact_still_hears_menu(client, twilio_post):
+    # VIPs no longer skip the menu; they pick a mailbox like everyone else.
+    upsert_contact("+15551112222", "Mom", is_vip=True)
     resp = twilio_post(
         client, "/call", {"From": "+15551112222", "CallSid": "CA" + "0" * 32}
     )
     assert resp.status_code == 200
-    assert b"/voicemail</Redirect>" in resp.data
-    assert b"<Gather" not in resp.data
+    assert b"<Gather" in resp.data
 
 
 def test_normal_caller_gets_menu(client, twilio_post):
@@ -50,28 +50,36 @@ def test_normal_caller_gets_menu(client, twilio_post):
     assert b"<Gather" in resp.data
 
 
-def test_allow_beats_block(client, twilio_post):
-    # A VIP contact who is also on the blocklist is allowed through to voicemail.
+def test_vip_beats_block(client, twilio_post):
+    # A VIP who is also on the blocklist is let through to the menu (not rejected).
     upsert_blocked("+15551112222")
-    upsert_contact("+15551112222", "Mom", skip_ivr_menu=True)
+    upsert_contact("+15551112222", "Mom", is_vip=True)
     resp = twilio_post(
         client, "/call", {"From": "+15551112222", "CallSid": "CA" + "0" * 32}
     )
     assert resp.status_code == 200
     assert b"<Reject" not in resp.data
-    assert b"/voicemail</Redirect>" in resp.data
+    assert b"<Gather" in resp.data
 
 
-def test_route_digit_one_redirects_to_voicemail(client, twilio_post):
+def test_route_digit_one_redirects_to_family_box(client, twilio_post):
     resp = twilio_post(client, "/call/route", {"Digits": "1"})
     assert resp.status_code == 200
-    assert b"/voicemail</Redirect>" in resp.data
+    assert b"/voicemail?box=family" in resp.data
+
+
+def test_route_digits_map_to_each_box(client, twilio_post):
+    for digit, slug in (("2", "cody"), ("3", "ryan"), ("4", "cory")):
+        resp = twilio_post(client, "/call/route", {"Digits": digit})
+        assert resp.status_code == 200
+        assert f"/voicemail?box={slug}".encode() in resp.data
 
 
 def test_route_invalid_digit_replays_menu(client, twilio_post):
+    # Digit 9 is not mapped to any box.
     resp = twilio_post(client, "/call/route", {"Digits": "9"})
     assert resp.status_code == 200
-    assert b"/voicemail</Redirect>" not in resp.data
+    assert b"/voicemail?box=" not in resp.data
     assert b"/call</Redirect>" in resp.data
 
 

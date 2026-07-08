@@ -36,11 +36,12 @@ python -c "from werkzeug.security import generate_password_hash; print(generate_
 | Page | Path | What it does |
 |------|------|--------------|
 | Dashboard | `/admin/` | Message count, unread count, SMS status, and last connection-test result |
-| Messages | `/admin/messages` | Paginated inbox with search, transcript previews, and read/unread |
-| Message detail | `/admin/messages/<id>` | Metadata, transcript, audio player, delete, block caller |
+| Messages | `/admin/messages` | Paginated inbox with search, box filter, transcript previews, and read/unread |
+| Message detail | `/admin/messages/<id>` | Metadata, mailbox, transcript, audio player, delete, block caller |
+| Voicemail boxes | `/admin/boxes` | Manage the per-recipient mailboxes (Family, Cody, Ryan, Cory) |
 | Contacts | `/admin/contacts` | Manage the phone → name address book; CSV import |
 | Blocklist | `/admin/blocked` | Manage blocked numbers; optional CallShield starter import |
-| Settings | `/admin/settings` | Edit IVR/voicemail prompts, voice, toggles, and SMS recipients |
+| Settings | `/admin/settings` | Edit IVR/voicemail prompts, voice, toggles, and default SMS recipients |
 | Connection | `/admin/connection` | Run Twilio ↔ app diagnostics; copy webhook URLs; test SMS |
 
 ## Messages inbox
@@ -53,8 +54,34 @@ python -c "from werkzeug.security import generate_password_hash; print(generate_
   new messages.
 - **Transcript preview**: when transcription is on, each row shows a short preview
   of the transcript (or "Transcribing…" until Twilio's callback arrives).
+- **Box filter**: each message shows which mailbox it was left in, and the "All
+  boxes" dropdown narrows the inbox to a single recipient (Family, Cody, Ryan,
+  or Cory).
 - **Block caller**: from a message detail page, block the caller's number directly
   (adds them to the blocklist with a note referencing the message).
+
+## Voicemail boxes
+
+Callers hear one shared main menu and press a digit to choose whose mailbox to
+leave a message in. Four boxes are set up out of the box:
+
+| Digit | Box |
+|-------|-----|
+| 1 | Family |
+| 2 | Cody |
+| 3 | Ryan |
+| 4 | Cory |
+
+- The main menu greeting is the intro from Settings followed by an automatically
+  generated "For {name}, press {digit}." line for each enabled box, so adding or
+  renaming a box updates the menu without editing the greeting text.
+- Each box can override the **voicemail prompt**, **thank-you message**, and **SMS
+  notification recipients**. Leave any of these blank to inherit the global
+  default from Settings.
+- A box can be **disabled**, which removes it from the menu and stops its digit
+  from doing anything.
+- Every saved message is tagged with its box, shown in the inbox and on the
+  message detail page, and filterable from the inbox.
 
 ## Contacts
 
@@ -66,11 +93,10 @@ appear everywhere a caller ID is shown (inbox, dashboard, message detail).
 - **CSV import**: upload a file with `phone,display_name` columns (an optional
   header row is allowed). Existing numbers are updated; invalid rows are skipped
   and reported.
-- **VIP / skip menu**: enable "Skip the menu and go straight to voicemail" on a
-  contact to let them bypass the "Press 1" main menu. VIP contacts always win over
-  the blocklist — a number that is both VIP and blocked is allowed through to
-  voicemail. When personalized greetings are enabled, VIP callers still hear their
-  name in the voicemail prompt.
+- **VIP**: enable "VIP contact (bypasses blocklist)" to always let a contact
+  through, even if their number is on the blocklist — a number that is both VIP
+  and blocked is allowed through. VIPs still hear the main menu and choose a
+  mailbox like everyone else; the flag only affects blocklist handling.
 
 ## Blocklist
 
@@ -96,14 +122,14 @@ selection, toggles, and the recording length limit:
 | Setting | Notes |
 |---------|-------|
 | IVR voice | Google Neural2 English voices (via Twilio), grouped by region (US/UK) and gender (male/female) |
-| Main menu greeting | ≤ 500 chars; SSML tags for pauses/emphasis supported |
+| Main menu greeting | ≤ 500 chars; the intro before the auto-generated "press N" box options; SSML tags supported |
 | Enable personalized greetings | Off by default; see [Personalized greetings](#personalized-greetings) |
 | Invalid input message | ≤ 500 chars; SSML tags supported |
-| Voicemail prompt | ≤ 500 chars; SSML tags supported |
-| Thank-you message | ≤ 500 chars; SSML tags supported |
+| Voicemail prompt | ≤ 500 chars; default for boxes that don't set their own; SSML tags supported |
+| Thank-you message | ≤ 500 chars; default for boxes that don't set their own; SSML tags supported |
 | Max recording length | 10–600 seconds |
 | Enable voicemail transcription | Off by default; see [Voicemail transcription](#voicemail-transcription) |
-| SMS notification recipients | Optional. E.164 numbers (one per line or comma-separated) that receive a text when a voicemail is saved. Leave blank to disable. Invalid numbers are rejected on save. |
+| SMS notification recipients | Optional default list. E.164 numbers (one per line or comma-separated) that receive a text when a voicemail is saved in a box with no recipients of its own. Leave blank to disable. Invalid numbers are rejected on save. |
 | Blocked caller handling | Reject (busy) or play a message, then hang up |
 | Blocked caller message | Spoken when "play a message" is selected; SSML supported |
 
@@ -152,8 +178,8 @@ voicemail prompt.
   `Thanks for calling {name}` for voicemail.
 - Callers whose number is not in your contacts, or whose caller ID is hidden,
   hear the prompts unchanged; any leftover `{name}` token is removed cleanly.
-- VIP contacts (those flagged to skip the menu) still hear the personalized
-  voicemail prompt, since personalization happens when voicemail starts.
+- Personalization applies to whichever box the caller chooses, using that box's
+  prompt (or the global default when the box inherits it).
 
 ## Connection diagnostics
 

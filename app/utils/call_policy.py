@@ -3,8 +3,9 @@
 Two independent checks decide what an incoming caller hears:
 
 - ``is_blocked`` — the number is on the blocklist and should be rejected.
-- ``should_skip_ivr_menu`` — the caller is a contact marked as VIP and should go
-  straight to voicemail, skipping the "Press 1" menu.
+- ``is_vip_contact`` — the caller is a contact marked as VIP. VIPs bypass the
+  blocklist (a number that is both VIP and blocked is still allowed through);
+  they still choose a mailbox from the menu like everyone else.
 
 Lookups reuse the same normalization and last-10-digit fallback as the contacts
 address book, and the blocklist index is cached on ``flask.g`` so gating a call
@@ -68,12 +69,12 @@ def is_blocked(caller_id):
     return last_ten(normalized) in tail
 
 
-def should_skip_ivr_menu(caller_id):
-    """Return True if the caller is a contact flagged to skip the main menu."""
+def is_vip_contact(caller_id):
+    """Return True if the caller is a contact flagged as VIP."""
     normalized = normalize_caller_id(caller_id)
     if not normalized:
         return False
     contact = get_contact_by_phone(normalized)
     if contact is None:
         return False
-    return bool(contact["skip_ivr_menu"])
+    return bool(contact["is_vip"])

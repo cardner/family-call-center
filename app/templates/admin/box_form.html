@@ -1,0 +1,64 @@
+{% extends "admin/base.html" %}
+{% block title %}Edit {{ box['display_name'] }}{% endblock %}
+
+{% block content %}
+<div class="app-topbar">
+  <h2 class="app-title">Edit {{ box['display_name'] }} box</h2>
+  <a class="btn btn-outline btn-sm" href="{{ url_for('admin.boxes') }}">← Back</a>
+</div>
+
+<div class="card">
+  <form method="post" data-trim>
+    {{ form.csrf_token }}
+
+    <div class="field">
+      <label class="label" for="display_name">Display name</label>
+      <input class="input" id="display_name" name="display_name" type="text" maxlength="120"
+             required value="{{ form.display_name.data or '' }}" style="max-width:360px;" />
+      {% for error in form.display_name.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="extension_digit">Menu digit</label>
+      <select class="input" id="extension_digit" name="extension_digit" required style="max-width:120px;">
+        {% for value, label in form.extension_digit.choices %}
+        <option value="{{ value }}" {{ 'selected' if form.extension_digit.data == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">The keypad digit callers press to reach this box. Each digit must be unique.</p>
+      {% for error in form.extension_digit.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="enabled" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="enabled" name="enabled" type="checkbox" value="y" style="width:auto;" {{ 'checked' if form.enabled.data }} />
+        Enabled
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When disabled, this box is left out of the menu and its digit does nothing.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="voicemail_prompt">Voicemail prompt</label>
+      <textarea class="input" id="voicemail_prompt" name="voicemail_prompt" rows="3" maxlength="500" style="font-family:ui-monospace, monospace;">{{ form.voicemail_prompt.data or '' }}</textarea>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Spoken before the beep. Leave blank to use the default voicemail prompt from Settings. SSML tags are supported.</p>
+      {% for error in form.voicemail_prompt.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="voicemail_thanks">Thank-you message</label>
+      <textarea class="input" id="voicemail_thanks" name="voicemail_thanks" rows="2" maxlength="500" style="font-family:ui-monospace, monospace;">{{ form.voicemail_thanks.data or '' }}</textarea>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Spoken after the caller hangs up recording. Leave blank to use the default from Settings.</p>
+      {% for error in form.voicemail_thanks.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="notify_phone_numbers">SMS notification recipients</label>
+      <textarea class="input" id="notify_phone_numbers" name="notify_phone_numbers" rows="3" maxlength="500" placeholder="+15551234567&#10;+15559876543" style="font-family:ui-monospace, monospace;">{{ form.notify_phone_numbers.data or '' }}</textarea>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">One E.164 number per line (or comma-separated). These get a text when a message lands in this box. Leave blank to use the global recipients from Settings.</p>
+      {% for error in form.notify_phone_numbers.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <button type="submit" class="btn">Save box</button>
+  </form>
+</div>
+{% endblock %}

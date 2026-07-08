@@ -1,3 +1,4 @@
+from app.utils.boxes import get_box_by_slug, update_box
 from app.utils.db import upsert_contact
 from app.utils.settings import set_setting
 
@@ -27,12 +28,29 @@ def test_transcription_setting_caps_max_length_at_120(client, twilio_post):
 
 
 def test_vip_voicemail_personalized(client, twilio_post):
-    # A VIP contact skips the menu but should still hear a personalized prompt.
-    upsert_contact("+15551112222", "Mom", skip_ivr_menu=True)
+    # A VIP contact hears a personalized voicemail prompt on the chosen box.
+    upsert_contact("+15551112222", "Mom", is_vip=True)
     set_setting("personalized_greeting_enabled", "true")
     resp = twilio_post(client, "/voicemail", {"From": "+15551112222"})
     assert resp.status_code == 200
     assert b"Thanks for calling Mom" in resp.data
+
+
+def test_box_prompt_overrides_global_in_twiml(client, twilio_post):
+    # A box with its own prompt uses it instead of the global default.
+    fam = get_box_by_slug("family")
+    update_box(fam["id"], voicemail_prompt="Family mailbox, leave a note.")
+    resp = twilio_post(client, "/voicemail?box=family", {})
+    assert resp.status_code == 200
+    assert b"Family mailbox, leave a note." in resp.data
+
+
+def test_box_thanks_used_on_done(client, twilio_post):
+    fam = get_box_by_slug("family")
+    update_box(fam["id"], voicemail_thanks="Thanks from the family box.")
+    resp = twilio_post(client, "/voicemail/done?box=family", {})
+    assert resp.status_code == 200
+    assert b"Thanks from the family box." in resp.data
 
 
 def test_voicemail_personalized_for_menu_caller(client, twilio_post):

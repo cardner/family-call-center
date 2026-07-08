@@ -38,11 +38,12 @@ def message_admin_url(message_id):
     return f"{Config.BASE_URL}/admin/messages/{message_id}"
 
 
-def format_sms_body(caller_id, duration, message_id):
+def format_sms_body(caller_id, duration, message_id, box_name=None):
     """Build the SMS text for a new voicemail alert."""
     caller = caller_id or "unknown"
+    recipient = f" for {box_name}" if box_name else ""
     body = (
-        f"New voicemail from {caller} ({duration}s). "
+        f"New voicemail{recipient} from {caller} ({duration}s). "
         f"Listen: {message_admin_url(message_id)}"
     )
     return body[:_SMS_BODY_MAX_LENGTH]
@@ -63,23 +64,32 @@ def _send_sms(to, body, client_factory=None):
         return {"to": to, "status": "failed", "detail": str(exc)}
 
 
-def _send_to_all(body, client_factory=None):
-    recipients = get_notify_phone_numbers()
+def _send_to(recipients, body, client_factory=None):
     if not recipients:
         return []
     return [_send_sms(to, body, client_factory=client_factory) for to in recipients]
 
 
-def notify_new_message(
-    *, message_id, caller_id, duration, created_at=None, client_factory=None
-):
-    """Send a new-voicemail SMS to every configured recipient.
+def _send_to_all(body, client_factory=None):
+    return _send_to(get_notify_phone_numbers(), body, client_factory=client_factory)
 
-    Best-effort: returns per-recipient results and never raises. An empty list
-    means notifications are disabled (no recipients configured).
+
+def notify_new_message(
+    *, message_id, caller_id, duration, created_at=None, box=None, client_factory=None
+):
+    """Send a new-voicemail SMS to the box's recipients (or the global list).
+
+    A box uses its own SMS recipients when it has any configured; otherwise it
+    falls back to the global recipient list. Best-effort: returns per-recipient
+    results and never raises. An empty list means no recipients were configured.
     """
-    body = format_sms_body(caller_id, duration, message_id)
-    return _send_to_all(body, client_factory=client_factory)
+    from app.utils.boxes import get_box_notify_phone_numbers
+
+    box_recipients = get_box_notify_phone_numbers(box)
+    recipients = box_recipients or get_notify_phone_numbers()
+    box_name = box["display_name"] if box else None
+    body = format_sms_body(caller_id, duration, message_id, box_name=box_name)
+    return _send_to(recipients, body, client_factory=client_factory)
 
 
 def send_test_notification(client_factory=None):

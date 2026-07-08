@@ -1,4 +1,5 @@
 import app.routes.voicemail as vm
+from app.utils.boxes import get_box_by_slug
 from app.utils.db import count_recordings, list_recordings
 
 
@@ -97,6 +98,30 @@ def test_voicemail_embeds_caller_in_callback_url(client, twilio_post):
     )
     assert resp.status_code == 200
     assert b"caller=%2B15551234567" in resp.data
+
+
+def test_callback_saves_box_id_and_notifies_box(client, twilio_post, monkeypatch):
+    monkeypatch.setattr(vm.http_requests, "get", lambda *a, **k: _FakeResponse())
+    monkeypatch.setattr(vm, "_delete_from_twilio", lambda sid: None)
+    calls = []
+    monkeypatch.setattr(vm, "notify_new_message", lambda **kwargs: calls.append(kwargs))
+
+    sid = "RE" + "d" * 32
+    data = {
+        "RecordingSid": sid,
+        "RecordingUrl": "https://api.twilio.com/2010-04-01/Recordings/" + sid,
+        "RecordingDuration": "6",
+        "From": "+15551234567",
+    }
+    resp = twilio_post(client, "/voicemail/callback?box=cody", data)
+
+    assert resp.status_code == 204
+    cody = get_box_by_slug("cody")
+    row = list_recordings(limit=1)[0]
+    assert row["box_id"] == cody["id"]
+    assert row["box_name"] == "Cody"
+    # The box is handed to the notifier so it can pick the right recipients.
+    assert calls[0]["box"]["slug"] == "cody"
 
 
 def test_callback_uses_caller_query_param(client, twilio_post, monkeypatch):

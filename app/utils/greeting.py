@@ -40,9 +40,7 @@ def _strip_name_placeholder(text):
     return cleaned.strip()
 
 
-def _personalize_prompt(setting_key, caller_id, auto_prefix_template):
-    base_text = get_setting(setting_key)
-
+def _personalize_text(base_text, caller_id, auto_prefix_template):
     if not is_personalized_greeting_enabled():
         return _strip_name_placeholder(base_text)
 
@@ -60,16 +58,45 @@ def _personalize_prompt(setting_key, caller_id, auto_prefix_template):
 
 
 def format_greeting(caller_id=None):
-    """Return the main menu greeting, personalized when enabled and known."""
-    return _personalize_prompt(
-        "greeting", caller_id, 'Hi {name}. <break time="200ms"/> '
+    """Return the main menu intro, personalized when enabled and known."""
+    return _personalize_text(
+        get_setting("greeting"), caller_id, 'Hi {name}. <break time="200ms"/> '
     )
 
 
-def format_voicemail_prompt(caller_id=None):
-    """Return the voicemail prompt, personalized when enabled and known."""
-    return _personalize_prompt(
-        "voicemail_prompt",
+def _menu_options_text():
+    """Build the spoken "For {name}, press {digit}." list from enabled boxes."""
+    from app.utils.boxes import list_boxes
+
+    parts = []
+    for box in list_boxes(enabled_only=True):
+        parts.append(
+            f'For {box["display_name"]}, '
+            f'<emphasis level="moderate">press {box["extension_digit"]}</emphasis>.'
+        )
+    return " ".join(parts)
+
+
+def format_menu_greeting(caller_id=None):
+    """Return the full main menu: the intro plus each box's press option."""
+    intro = format_greeting(caller_id)
+    options = _menu_options_text()
+    if not options:
+        return intro
+    return f"{intro} {options}" if intro else options
+
+
+def format_voicemail_prompt(caller_id=None, box=None):
+    """Return the voicemail prompt, personalized when enabled and known.
+
+    Uses the box's own prompt when set, otherwise the global ``voicemail_prompt``
+    setting so a box that hasn't been customized inherits the default.
+    """
+    base_text = (box["voicemail_prompt"] if box else "") or get_setting(
+        "voicemail_prompt"
+    )
+    return _personalize_text(
+        base_text,
         caller_id,
         'Thanks for calling {name}. <break time="200ms"/> ',
     )
