@@ -3,9 +3,10 @@
 > **Note:** This repository is unmaintained, unsupported, and shared as-is as untested example code.
 
 A voicemail-focused Flask + Twilio app with a session-authenticated admin UI. When a
-caller reaches `/call`, they hear a main menu with one option: press **1** to leave a
-voicemail. The app records audio, stores it under `data/recordings/YYYY/MM/DD/`,
-logs metadata in `data/ivr.db`, and deletes the recording from Twilio after download.
+caller reaches `/call`, they hear a main menu and press a digit to choose whose
+mailbox to leave a message in (Family, Cody, Ryan, or Cory). The app records audio,
+stores it under `data/recordings/YYYY/MM/DD/` tagged with the chosen box, logs
+metadata in `data/ivr.db`, and deletes the recording from Twilio after download.
 
 It ships with a Docker image for self-hosting (built for a Ugreen NAS behind Nginx
 Proxy Manager), 1Password-based secret management, an admin UI for managing

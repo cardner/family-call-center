@@ -132,7 +132,9 @@ In the Twilio Console, set the phone number's Voice webhook:
 
 The other endpoints (`/voicemail`, `/voicemail/done`, `/voicemail/callback`,
 `/voicemail/transcribe`) are driven by TwiML the app returns; you only configure
-`/call`.
+`/call`. The single menu routes callers to per-recipient voicemail boxes
+(Family, Cody, Ryan, Cory) by keypad digit — no extra Twilio numbers or webhooks
+are needed.
 
 ## 6a. Configure SMS notifications (Twilio Console)
 
@@ -161,7 +163,10 @@ as the sender. Recipient numbers are set in the admin UI, not in `.env`.
 5. **Add recipients in the admin UI.** Log in at
    `https://voicemail.yourdomain.com/admin/settings`, enter numbers in the **SMS
    notification recipients** field (E.164 format, one per line or comma-separated),
-   and save. No container restart is needed.
+   and save. No container restart is needed. These are the default recipients; to
+   text different people per mailbox, set recipients on each box under
+   **Voicemail boxes** (`/admin/boxes`) — a box with its own recipients overrides
+   the default list.
 6. **Test delivery.** Open the Connection page and click **Send test SMS**; each
    recipient should receive a message within seconds.
 
@@ -229,8 +234,9 @@ the Settings toggle off.
 
 ## Data and updates
 
-- Voicemail audio lives under `./data/recordings/YYYY/MM/DD/`; metadata, contacts,
-  blocklist, and settings in `./data/ivr.db`. Both persist across container
-  restarts and image updates because they are on the `./data` volume.
+- Voicemail audio lives under `./data/recordings/YYYY/MM/DD/`; metadata (tagged
+  with its voicemail box), contacts, blocklist, voicemail boxes, and settings in
+  `./data/ivr.db`. Both persist across container restarts and image updates
+  because they are on the `./data` volume.
 - To update: publish a new tag, update `IMAGE`, then re-run `./scripts/deploy.sh`.
 - `chmod 600 .env` and never commit it.
