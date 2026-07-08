@@ -1,3 +1,4 @@
+from app.utils.db import upsert_contact
 from app.utils.settings import set_setting
 
 
@@ -23,3 +24,28 @@ def test_transcription_setting_caps_max_length_at_120(client, twilio_post):
     assert resp.status_code == 200
     assert b'maxLength="120"' in resp.data
     assert b'transcribe="true"' in resp.data
+
+
+def test_vip_voicemail_personalized(client, twilio_post):
+    # A VIP contact skips the menu but should still hear a personalized prompt.
+    upsert_contact("+15551112222", "Mom", skip_ivr_menu=True)
+    set_setting("personalized_greeting_enabled", "true")
+    resp = twilio_post(client, "/voicemail", {"From": "+15551112222"})
+    assert resp.status_code == 200
+    assert b"Thanks for calling Mom" in resp.data
+
+
+def test_voicemail_personalized_for_menu_caller(client, twilio_post):
+    upsert_contact("+15551112222", "Mom")
+    set_setting("personalized_greeting_enabled", "true")
+    set_setting("voicemail_prompt", "Hey {name}, leave a message.")
+    resp = twilio_post(client, "/voicemail", {"From": "+15551112222"})
+    assert resp.status_code == 200
+    assert b"Hey Mom, leave a message." in resp.data
+
+
+def test_voicemail_not_personalized_when_disabled(client, twilio_post):
+    upsert_contact("+15551112222", "Mom")
+    resp = twilio_post(client, "/voicemail", {"From": "+15551112222"})
+    assert resp.status_code == 200
+    assert b"Mom" not in resp.data

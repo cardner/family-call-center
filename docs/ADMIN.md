@@ -2,7 +2,11 @@
 
 The admin UI is a server-rendered Flask + Jinja interface (skinned with
 [Basecoat](https://basecoatui.com/)) for reviewing voicemail, editing the IVR
-prompts, and checking the Twilio connection. It lives under `/admin`.
+prompts, managing contacts and blocked numbers, and checking the Twilio
+connection. It lives under `/admin`.
+
+On mobile (≤720px viewport), navigation collapses behind a hamburger menu in a
+sticky header bar. Tap the icon to expand the sidebar links.
 
 ## Access and login
 
@@ -12,8 +16,14 @@ prompts, and checking the Twilio connection. It lives under `/admin`.
   - `ADMIN_PASSWORD` or, preferred, `ADMIN_PASSWORD_HASH` (a werkzeug hash). When
     the hash is set it takes precedence.
 - Sessions are cookie-based. When `BASE_URL` is `https://…` the session cookie is
-  marked `Secure`; it is always `HttpOnly` and `SameSite=Lax`, and expires after
-  24 hours.
+  marked `Secure`; it is always `HttpOnly` and `SameSite=Lax`.
+- Sessions are bounded two ways: an **idle timeout** logs out inactive sessions
+  (default 30 minutes), and an **absolute cap** from login time ends the session
+  regardless of activity (default 8 hours). Active use extends a session only up
+  to the absolute cap, so an admin cannot stay logged in indefinitely. Both are
+  configurable:
+  - `SESSION_IDLE_TIMEOUT_MINUTES` (default `30`)
+  - `SESSION_ABSOLUTE_MAX_HOURS` (default `8`)
 
 Generate a password hash:
 
@@ -25,12 +35,13 @@ python -c "from werkzeug.security import generate_password_hash; print(generate_
 
 | Page | Path | What it does |
 |------|------|--------------|
-| Dashboard | `/admin/` | Message count, unread count, and last connection-test result |
+| Dashboard | `/admin/` | Message count, unread count, SMS status, and last connection-test result |
 | Messages | `/admin/messages` | Paginated inbox with search, transcript previews, and read/unread |
-| Message detail | `/admin/messages/<id>` | Metadata, transcript, audio player, delete |
+| Message detail | `/admin/messages/<id>` | Metadata, transcript, audio player, delete, block caller |
 | Contacts | `/admin/contacts` | Manage the phone → name address book; CSV import |
-| Settings | `/admin/settings` | Edit IVR/voicemail prompts, max recording length, transcription toggle |
-| Connection | `/admin/connection` | Run Twilio ↔ NAS diagnostics; copy webhook URLs |
+| Blocklist | `/admin/blocked` | Manage blocked numbers; optional CallShield starter import |
+| Settings | `/admin/settings` | Edit IVR/voicemail prompts, voice, toggles, and SMS recipients |
+| Connection | `/admin/connection` | Run Twilio ↔ app diagnostics; copy webhook URLs; test SMS |
 
 ## Messages inbox
 
@@ -42,6 +53,8 @@ python -c "from werkzeug.security import generate_password_hash; print(generate_
   new messages.
 - **Transcript preview**: when transcription is on, each row shows a short preview
   of the transcript (or "Transcribing…" until Twilio's callback arrives).
+- **Block caller**: from a message detail page, block the caller's number directly
+  (adds them to the blocklist with a note referencing the message).
 
 ## Contacts
 
@@ -53,21 +66,46 @@ appear everywhere a caller ID is shown (inbox, dashboard, message detail).
 - **CSV import**: upload a file with `phone,display_name` columns (an optional
   header row is allowed). Existing numbers are updated; invalid rows are skipped
   and reported.
+- **VIP / skip menu**: enable "Skip the menu and go straight to voicemail" on a
+  contact to let them bypass the "Press 1" main menu. VIP contacts always win over
+  the blocklist — a number that is both VIP and blocked is allowed through to
+  voicemail. When personalized greetings are enabled, VIP callers still hear their
+  name in the voicemail prompt.
+
+## Blocklist
+
+Blocked numbers are stopped at `/call` before they reach the menu or voicemail.
+
+- Add, edit, or remove numbers manually. Each entry can have an optional note
+  (e.g. "robocaller").
+- **Block from message**: use the block action on a message detail page to add the
+  caller's number with a reference to that message.
+- **Starter blocklist**: optionally import frequently reported robocall/scam numbers
+  from the community [CallShield](https://github.com/SysAdminDoc/CallShield) database
+  (MIT licensed, FCC/FTC sourced). Manually blocked numbers are never affected.
+  Imported entries can be bulk-removed later without touching manual blocks.
+- **Blocked caller handling** (Settings): choose how blocked callers are treated:
+  - **Reject** — busy signal, no audio (default).
+  - **Play a message** — speak the configured blocked-caller message, then hang up.
 
 ## Settings
 
 Editable prompts (spoken by the IVR with neural TTS and optional SSML), voice
-selection, and the recording length limit:
+selection, toggles, and the recording length limit:
 
 | Setting | Notes |
 |---------|-------|
 | IVR voice | Google Neural2 English voices (via Twilio), grouped by region (US/UK) and gender (male/female) |
 | Main menu greeting | ≤ 500 chars; SSML tags for pauses/emphasis supported |
+| Enable personalized greetings | Off by default; see [Personalized greetings](#personalized-greetings) |
 | Invalid input message | ≤ 500 chars; SSML tags supported |
 | Voicemail prompt | ≤ 500 chars; SSML tags supported |
 | Thank-you message | ≤ 500 chars; SSML tags supported |
 | Max recording length | 10–600 seconds |
-| Enable voicemail transcription | Off by default; see below |
+| Enable voicemail transcription | Off by default; see [Voicemail transcription](#voicemail-transcription) |
+| SMS notification recipients | Optional. E.164 numbers (one per line or comma-separated) that receive a text when a voicemail is saved. Leave blank to disable. Invalid numbers are rejected on save. |
+| Blocked caller handling | Reject (busy) or play a message, then hang up |
+| Blocked caller message | Spoken when "play a message" is selected; SSML supported |
 
 The **IVR voice** dropdown lists the US and UK English Google Neural2 voices
 Twilio supports, grouped by region and gender. The selected voice is used for
@@ -79,6 +117,11 @@ selected voice's language and gender to a local browser voice and interprets the
 SSML pauses/emphasis, so it is good for checking wording and pacing. It does not
 use the exact Twilio Neural2 voice — call your IVR number after saving to hear
 the exact result. No API key or extra configuration is required.
+
+Allowed SSML tags: `<break time="300ms"/>`, `<emphasis level="moderate">…</emphasis>`, `<prosody rate="slow">…</prosody>`. Unknown tags are stripped on save.
+
+Twilio credentials, `BASE_URL`, and `DATA_DIR` are configuration, not settings —
+they stay in the environment and are not editable from the UI.
 
 ### Voicemail transcription
 
@@ -95,12 +138,22 @@ preview and on the message detail page, and become searchable.
 - Transcription is asynchronous: Twilio posts the text to
   `/voicemail/transcribe` a few seconds after the recording is saved, so a new
   message may briefly show "Transcribing…".
-| SMS notification recipients | Optional. E.164 numbers (one per line or comma-separated) that receive a text when a voicemail is saved. Leave blank to disable. Invalid numbers are rejected on save. |
 
-Allowed SSML tags: `<break time="300ms"/>`, `<emphasis level="moderate">…</emphasis>`, `<prosody rate="slow">…</prosody>`. Unknown tags are stripped on save.
+### Personalized greetings
 
-Twilio credentials, `BASE_URL`, and `DATA_DIR` are configuration, not settings —
-they stay in the environment and are not editable from the UI.
+Turning on **Enable personalized greetings** makes the app look up the caller's
+number in your contacts and speak their name in the main menu greeting and the
+voicemail prompt.
+
+- Put a `{name}` token anywhere in the greeting or voicemail prompt to control
+  where the name is spoken (for example, `Hi {name}. Welcome.`).
+- If a prompt has no `{name}` token, the app automatically prepends a salutation
+  when the caller is known: `Hi {name}` for the main menu and
+  `Thanks for calling {name}` for voicemail.
+- Callers whose number is not in your contacts, or whose caller ID is hidden,
+  hear the prompts unchanged; any leftover `{name}` token is removed cleanly.
+- VIP contacts (those flagged to skip the menu) still hear the personalized
+  voicemail prompt, since personalization happens when voicemail starts.
 
 ## Connection diagnostics
 
@@ -113,6 +166,7 @@ a call. Each check reports pass / warn / fail:
 - Public health URL reachable (a warn is expected when testing from your own LAN
   because of hairpin NAT — verify from cellular/off-network)
 - Webhook signature validation round-trips for `BASE_URL/call`
+- SMS notification configuration (on/off, recipient count)
 
 It also shows copy-ready webhook URLs and a reminder to place a live test call.
 The test endpoint is rate-limited and never displays secrets (the account SID is
@@ -131,6 +185,9 @@ account setup for SMS is covered in [DEPLOYMENT.md](DEPLOYMENT.md).
 ## Security model
 
 - Every `/admin/*` route except the login page requires an authenticated session.
+- Sessions expire on idle (default 30 min) and at an absolute cap from login
+  (default 8 hours); the session is regenerated on login to mitigate session
+  fixation, and logout always clears the session.
 - All mutating actions (login, logout, settings save, delete, run diagnostics) are
   POST with CSRF tokens (Flask-WTF).
 - Login is rate-limited (5/min per IP); the connection test is rate-limited

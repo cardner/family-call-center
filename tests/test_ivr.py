@@ -80,3 +80,35 @@ def test_route_multichar_digits_replays_menu(client, twilio_post):
     assert resp.status_code == 200
     assert b"/voicemail</Redirect>" not in resp.data
     assert b"/call</Redirect>" in resp.data
+
+
+def test_personalized_greeting_for_known_contact(client, twilio_post):
+    upsert_contact("+15551112222", "Mom")
+    set_setting("personalized_greeting_enabled", "true")
+    set_setting("greeting", "Hi {name}. Welcome.")
+    resp = twilio_post(
+        client, "/call", {"From": "+15551112222", "CallSid": "CA" + "0" * 32}
+    )
+    assert resp.status_code == 200
+    assert b"Hi Mom." in resp.data
+
+
+def test_personalized_greeting_auto_prefix(client, twilio_post):
+    upsert_contact("+15551112222", "Mom")
+    set_setting("personalized_greeting_enabled", "true")
+    resp = twilio_post(
+        client, "/call", {"From": "+15551112222", "CallSid": "CA" + "0" * 32}
+    )
+    assert resp.status_code == 200
+    assert b"Hi Mom" in resp.data
+
+
+def test_personalized_greeting_disabled(client, twilio_post):
+    upsert_contact("+15551112222", "Mom")
+    set_setting("greeting", "Hi {name}. Welcome.")
+    resp = twilio_post(
+        client, "/call", {"From": "+15551112222", "CallSid": "CA" + "0" * 32}
+    )
+    assert resp.status_code == 200
+    assert b"Mom" not in resp.data
+    assert b"Welcome." in resp.data

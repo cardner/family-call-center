@@ -15,6 +15,7 @@ from app.utils.db import (
     log_recording,
     update_recording_transcript,
 )
+from app.utils.greeting import format_voicemail_prompt
 from app.utils.notify import notify_new_message
 from app.utils.settings import (
     TRANSCRIPTION_MAX_RECORDING_SECONDS,
@@ -83,7 +84,7 @@ def voicemail():
             )
 
         vr = VoiceResponse()
-        say_prompt(vr, get_setting("voicemail_prompt"))
+        say_prompt(vr, format_voicemail_prompt(caller_id))
         vr.record(**record_kwargs)
         return twiml_response(vr)
     except Exception:

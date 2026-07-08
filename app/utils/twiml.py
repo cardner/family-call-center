@@ -1,5 +1,6 @@
 from twilio.twiml.voice_response import VoiceResponse
 
+from app.utils.greeting import format_greeting
 from app.utils.settings import get_block_action, get_setting
 from app.utils.ssml import apply_ssml_to_say
 from app.utils.voices import ivr_voice_language, normalize_ivr_voice
@@ -49,16 +50,18 @@ def blocked_caller_twiml():
     return twiml_response(vr)
 
 
-def main_menu_twiml():
+def main_menu_twiml(caller_id=None):
     """Build and return the main menu TwiML using the configured greeting.
 
-    Prompt text is sanitized on save; SSML tags are rendered via the Twilio SDK.
+    The greeting is personalized with the caller's contact name when the feature
+    is enabled. Prompt text is sanitized on save; SSML tags are rendered via the
+    Twilio SDK.
     """
     vr = VoiceResponse()
     gather = vr.gather(
         num_digits=1, action=f"{Config.BASE_URL}/call/route", method="POST", timeout=10
     )
-    say_prompt(gather, get_setting("greeting"))
+    say_prompt(gather, format_greeting(caller_id))
     # If no input, repeat the menu
     vr.redirect(f"{Config.BASE_URL}/call")
     return twiml_response(vr)

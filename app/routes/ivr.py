@@ -46,7 +46,7 @@ def call():
             logger.info("Blocked call from %s", caller)
             return blocked_caller_twiml()
 
-        return main_menu_twiml()
+        return main_menu_twiml(caller)
     except Exception:
         logger.exception("Error in /call")
         return error_response()

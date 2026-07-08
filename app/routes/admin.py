@@ -97,8 +97,10 @@ def login():
 def logout():
     form = LogoutForm()
     if form.validate_on_submit():
-        logout_user()
         flash("You have been logged out.", "success")
+    # Always end the session on a logout POST, even if CSRF validation fails, so
+    # a stale or forged token can never leave an admin logged in.
+    logout_user()
     return redirect(url_for("admin.login"))
 
 
@@ -244,6 +246,10 @@ def settings():
             "transcription_enabled",
             "true" if form.transcription_enabled.data else "false",
         )
+        set_setting(
+            "personalized_greeting_enabled",
+            "true" if form.personalized_greeting_enabled.data else "false",
+        )
         set_setting("block_action", form.block_action.data)
         set_setting(
             "blocked_caller_message",
@@ -267,6 +273,9 @@ def settings():
             parse_phone_numbers(current.get("notify_phone_numbers"))
         )
         form.transcription_enabled.data = current.get("transcription_enabled") == "true"
+        form.personalized_greeting_enabled.data = (
+            current.get("personalized_greeting_enabled") == "true"
+        )
         form.block_action.data = current.get("block_action")
         form.blocked_caller_message.data = current.get("blocked_caller_message")
 

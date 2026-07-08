@@ -1,9 +1,14 @@
+import time
+
 from tests.helpers import extract_csrf, valid_settings
 
 
 def _login(client):
+    now = time.time()
     with client.session_transaction() as sess:
         sess["admin_logged_in"] = True
+        sess["_login_at"] = now
+        sess["_last_activity"] = now
 
 
 def test_settings_post_without_csrf_rejected(make_app):

@@ -13,6 +13,18 @@ def require_env(key):
     return value
 
 
+def _positive_int_env(key, default):
+    """Read a positive integer env var, falling back to ``default`` when unset or invalid."""
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
 class Config:
     TWILIO_ACCOUNT_SID = require_env("TWILIO_ACCOUNT_SID")
     TWILIO_AUTH_TOKEN = require_env("TWILIO_AUTH_TOKEN")
@@ -37,4 +49,12 @@ class Config:
     SESSION_COOKIE_SECURE = BASE_URL.lower().startswith("https://")
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
-    PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
+
+    # Session lifetime is bounded two ways: an idle timeout that logs out inactive
+    # sessions, and an absolute cap from login time so an active session cannot be
+    # extended indefinitely. Both are configurable via environment variables.
+    SESSION_IDLE_TIMEOUT = timedelta(minutes=_positive_int_env("SESSION_IDLE_TIMEOUT_MINUTES", 30))
+    SESSION_ABSOLUTE_MAX = timedelta(hours=_positive_int_env("SESSION_ABSOLUTE_MAX_HOURS", 8))
+
+    # The signed cookie should live no longer than the absolute session cap.
+    PERMANENT_SESSION_LIFETIME = SESSION_ABSOLUTE_MAX

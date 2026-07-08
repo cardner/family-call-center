@@ -16,6 +16,16 @@
     .app-shell { display: flex; min-height: 100vh; }
     .app-sidebar { width: 220px; border-right: 1px solid var(--shell-border); padding: 1.25rem 1rem; background: #fff; }
     .app-sidebar h1 { font-size: 1rem; margin: 0 0 1rem; }
+    .app-mobile-header { display: none; }
+    .app-nav-toggle {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 2.25rem; height: 2.25rem; padding: 0;
+      border: 1px solid var(--shell-border); border-radius: 0.5rem;
+      background: #fff; color: #111827; cursor: pointer;
+    }
+    .app-nav-toggle:hover { background: #f3f4f6; }
+    .app-nav-toggle svg { display: block; }
+    .app-mobile-brand { font-size: 1rem; font-weight: 600; }
     .app-nav { display: flex; flex-direction: column; gap: 0.25rem; }
     .app-nav a { display: block; padding: 0.5rem 0.75rem; border-radius: 0.5rem; text-decoration: none; font-size: 0.9rem; }
     .app-nav a:hover { background: #f3f4f6; }
@@ -117,7 +127,15 @@
     .code-block code { word-break: break-all; }
     @media (max-width: 720px) {
       .app-shell { flex-direction: column; }
-      .app-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--shell-border); }
+      .app-mobile-header {
+        display: flex; align-items: center; gap: 0.75rem;
+        padding: 0.6rem 1rem; background: #fff;
+        border-bottom: 1px solid var(--shell-border);
+        position: sticky; top: 0; z-index: 20;
+      }
+      .app-sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--shell-border); display: none; }
+      .app-sidebar h1 { display: none; }
+      .app-shell.nav-open .app-sidebar { display: block; }
       .app-main { padding: 1rem; }
       .app-topbar { flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
       .messages-toolbar { flex-direction: column; align-items: stretch; }
@@ -206,7 +224,18 @@
 <body>
 {% if session.get('admin_logged_in') %}
   <div class="app-shell">
-    <aside class="app-sidebar">
+    <header class="app-mobile-header">
+      <button type="button" class="app-nav-toggle" id="app-nav-toggle"
+              aria-controls="app-sidebar" aria-expanded="false" aria-label="Toggle navigation menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+      <span class="app-mobile-brand">Call Center</span>
+    </header>
+    <aside class="app-sidebar" id="app-sidebar">
       <h1>Call Center</h1>
       <nav class="app-nav">
         <a href="{{ url_for('admin.dashboard') }}" class="{{ 'active' if request.endpoint == 'admin.dashboard' }}">Dashboard</a>
@@ -232,6 +261,17 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+  <script>
+    (function () {
+      var toggle = document.getElementById('app-nav-toggle');
+      var shell = document.querySelector('.app-shell');
+      if (!toggle || !shell) return;
+      toggle.addEventListener('click', function () {
+        var open = shell.classList.toggle('nav-open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    })();
+  </script>
 {% else %}
   <main class="app-main" style="margin: 0 auto;">
     {% with messages = get_flashed_messages(with_categories=true) %}

@@ -7,6 +7,7 @@ plaintext ``ADMIN_PASSWORD`` otherwise. Credentials never touch the database.
 
 import hmac
 import logging
+import time
 from functools import wraps
 
 from flask import redirect, request, session, url_for
@@ -17,6 +18,8 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 SESSION_KEY = "admin_logged_in"
+LOGIN_AT_KEY = "_login_at"
+LAST_ACTIVITY_KEY = "_last_activity"
 
 
 def verify_credentials(username, password):
@@ -46,18 +49,54 @@ def verify_credentials(username, password):
 
 
 def login_user(username):
+    # Clear any pre-existing session data to regenerate the session and avoid
+    # session fixation, then establish the authenticated session.
+    session.clear()
+    now = time.time()
     session[SESSION_KEY] = True
     session["admin_username"] = username
+    session[LOGIN_AT_KEY] = now
+    session[LAST_ACTIVITY_KEY] = now
     session.permanent = True
 
 
 def logout_user():
-    session.pop(SESSION_KEY, None)
-    session.pop("admin_username", None)
+    session.clear()
+
+
+def _session_expired():
+    """Return True if the current session has passed its idle or absolute limit.
+
+    Sessions missing the login/activity timestamps (e.g. created before these
+    limits existed) are treated as expired so they are forced to re-authenticate.
+    """
+    now = time.time()
+
+    login_at = session.get(LOGIN_AT_KEY)
+    if login_at is None:
+        return True
+    if now - login_at > Config.SESSION_ABSOLUTE_MAX.total_seconds():
+        return True
+
+    last_activity = session.get(LAST_ACTIVITY_KEY)
+    if last_activity is None:
+        return True
+    if now - last_activity > Config.SESSION_IDLE_TIMEOUT.total_seconds():
+        return True
+
+    return False
 
 
 def is_logged_in():
-    return bool(session.get(SESSION_KEY))
+    if not session.get(SESSION_KEY):
+        return False
+
+    if _session_expired():
+        logout_user()
+        return False
+
+    session[LAST_ACTIVITY_KEY] = time.time()
+    return True
 
 
 def login_required(view):

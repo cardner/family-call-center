@@ -76,10 +76,15 @@ def client(app):
 @pytest.fixture
 def auth_client(app):
     """A test client with an authenticated admin session."""
+    import time
+
     client = app.test_client()
+    now = time.time()
     with client.session_transaction() as sess:
         sess["admin_logged_in"] = True
         sess["admin_username"] = Config.ADMIN_USERNAME
+        sess["_login_at"] = now
+        sess["_last_activity"] = now
     return client
 
 

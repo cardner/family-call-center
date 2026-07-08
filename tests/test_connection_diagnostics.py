@@ -1,3 +1,5 @@
+import time
+
 import app.routes.admin as admin_mod
 from app.utils import connection_test as ct
 from app.utils.settings import set_setting
@@ -140,8 +142,11 @@ def test_connection_test_rate_limited(make_app, monkeypatch):
     )
     app = make_app(ratelimit_enabled=True)
     client = app.test_client()
+    now = time.time()
     with client.session_transaction() as sess:
         sess["admin_logged_in"] = True
+        sess["_login_at"] = now
+        sess["_last_activity"] = now
 
     last = None
     for _ in range(4):

@@ -18,6 +18,9 @@ def create_app():
         SESSION_COOKIE_HTTPONLY=Config.SESSION_COOKIE_HTTPONLY,
         SESSION_COOKIE_SAMESITE=Config.SESSION_COOKIE_SAMESITE,
         PERMANENT_SESSION_LIFETIME=Config.PERMANENT_SESSION_LIFETIME,
+        # Keep the cookie expiry fixed from login instead of sliding on every
+        # request; the absolute cap is enforced in the auth layer.
+        SESSION_REFRESH_EACH_REQUEST=False,
         RATELIMIT_STORAGE_URI="memory://",
     )
 

@@ -30,11 +30,14 @@ pytest --cov=app --cov-report=term-missing
 | Health | `tests/test_health.py` |
 | Twilio signature auth | `tests/test_twilio_auth.py` |
 | IVR menu/routing | `tests/test_ivr.py` |
+| Call policy (blocklist + VIP) | `tests/test_call_policy.py` |
+| Personalized greetings | `tests/test_greeting.py` |
 | Voicemail callback | `tests/test_voicemail_callback.py` |
 | Voicemail transcription (Twilio callbacks) | `tests/test_transcription.py` |
 | Schema migrations | `tests/test_db_migrations.py` |
 | Read / unread | `tests/test_read_unread.py` |
 | Contacts + phone normalization | `tests/test_contacts.py` |
+| Blocklist admin + CallShield import | `tests/test_admin_blocked.py`, `tests/test_blocklist_import.py` |
 | Admin auth | `tests/test_admin_auth.py` |
 | CSRF | `tests/test_admin_csrf.py` |
 | Login rate limiting | `tests/test_admin_rate_limit.py` |
@@ -43,9 +46,13 @@ pytest --cov=app --cov-report=term-missing
 | Output encoding (XSS) | `tests/test_xss_output.py` |
 | Admin messages CRUD | `tests/test_admin_messages.py` |
 | Settings + IVR integration | `tests/test_settings.py`, `tests/test_voicemail_settings.py` |
+| SSML sanitization | `tests/test_ssml.py` |
+| IVR voice selection | `tests/test_voices.py` |
+| Date/time display helpers | `tests/test_display.py` |
 | Connection diagnostics | `tests/test_connection_diagnostics.py` |
 | SMS notifications (unit) | `tests/test_notify.py` |
 | SMS notifications (admin UI) | `tests/test_admin_notifications.py` |
+| Legal pages | `tests/test_legal.py` |
 | Static assets | `tests/test_static_basecoat.py` |
 
 ## Manual checkpoints by phase
@@ -118,6 +125,24 @@ Complete each phase's checks before moving on.
 - [ ] A bare 10-digit number is stored as +1 E.164; junk input is rejected
 - [ ] CSV import adds/updates contacts and reports skipped invalid rows
 - [ ] Deleting a contact reverts the caller ID back to the raw number
+- [ ] VIP contact ("Skip menu") goes straight to voicemail on a test call
+
+### Phase 4e — Personalized greetings
+
+- [ ] Enabling personalized greetings on Settings saves correctly
+- [ ] Known contact hears their name in the main menu greeting (auto-prefix or `{name}` token)
+- [ ] Known contact hears their name in the voicemail prompt
+- [ ] VIP contact hears personalized voicemail prompt without hearing the main menu
+- [ ] Unknown caller hears the normal greeting with no awkward "Hi ." phrasing
+- [ ] With the toggle off, greetings are unchanged even if `{name}` is in the text
+
+### Phase 4f — Blocklist
+
+- [ ] Adding a blocked number stops that caller from reaching the menu
+- [ ] "Reject" setting gives a busy signal; "Play a message" speaks the prompt and hangs up
+- [ ] Blocking a caller from a message detail page adds them to the blocklist
+- [ ] VIP contact who is also blocked is still allowed through to voicemail
+- [ ] Starter blocklist import adds numbers; bulk-remove only deletes imported entries
 
 ### Phase 5 — Basecoat UI
 
@@ -126,10 +151,12 @@ Check each page at desktop and mobile widths:
 - [ ] Login: styled card/button; error alert styled
 - [ ] Dashboard: nav visible; cards readable
 - [ ] Messages: table and buttons styled; pagination works; unread rows bold
-- [ ] Message detail: transcript, audio player, and delete work
-- [ ] Contacts: list, add/edit/delete, and CSV import styled and working
+- [ ] Message detail: transcript, audio player, delete, and block action work
+- [ ] Contacts: list, add/edit/delete, CSV import, and VIP toggle styled and working
+- [ ] Blocklist: list, add/edit/delete, starter import styled and working
 - [ ] Settings: inputs aligned; save shows a flash; HTML5 limits enforced
 - [ ] Connection: run tests works; badges readable; URLs copy; no secrets shown
+- [ ] Mobile (≤720px): hamburger menu toggles navigation; header stays sticky
 - [ ] No 404s for static assets; no unescaped user content in page source
 - [ ] Keyboard: tab order and visible focus on forms
 
@@ -139,6 +166,7 @@ Check each page at desktop and mobile widths:
 - [ ] Connection page: Twilio API check passes with real creds
 - [ ] Public health check passes from an external network
 - [ ] Webhook URLs match the Twilio console configuration
+- [ ] `GET /privacy-policy` and `GET /terms-and-conditions` return HTML
 - [ ] Live call → record → admin play → delete on the production hostname
 
 ## Future CI (out of scope for v1)

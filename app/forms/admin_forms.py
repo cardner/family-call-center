@@ -82,6 +82,7 @@ class SettingsForm(FlaskForm):
         validators=[Optional(), Length(max=NOTIFY_PHONE_NUMBERS_MAX_LENGTH)],
     )
     transcription_enabled = BooleanField("Enable voicemail transcription")
+    personalized_greeting_enabled = BooleanField("Enable personalized greetings")
     block_action = SelectField(
         "Blocked caller handling",
         choices=[

@@ -51,6 +51,7 @@ DEFAULT_SETTINGS = {
     "ivr_voice": "Google.en-US-Neural2-D",
     "notify_phone_numbers": "",
     "transcription_enabled": "false",
+    "personalized_greeting_enabled": "false",
     "block_action": "reject",
     "blocked_caller_message": (
         "This number is not accepting calls. <break time=\"200ms\"/> Goodbye."
@@ -115,6 +116,11 @@ def get_max_recording_seconds():
 def is_transcription_enabled():
     """Return True if voicemail transcription is turned on in Settings."""
     return get_setting("transcription_enabled", "false") == "true"
+
+
+def is_personalized_greeting_enabled():
+    """Return True if personalized greetings are turned on in Settings."""
+    return get_setting("personalized_greeting_enabled", "false") == "true"
 
 
 def get_block_action():

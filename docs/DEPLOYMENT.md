@@ -15,6 +15,20 @@ The container publishes no host ports. NPM reaches it by container name on a
 shared Docker network. Twilio webhooks and the admin UI share one hostname
 (optionally split the admin UI onto its own subdomain — see below).
 
+### External services
+
+| Service | Required | Purpose |
+|---------|----------|---------|
+| Twilio Voice | yes | Incoming calls, IVR, voicemail recording, neural TTS |
+| Twilio SMS | optional | Voicemail alert texts to configured recipients |
+| Twilio Transcription | optional | Speech-to-text on recordings (Settings toggle) |
+| Nginx Proxy Manager | yes (this guide) | HTTPS reverse proxy |
+| 1Password CLI | optional | Secret injection on the NAS (`op inject` / `op run`) |
+| CallShield | optional | Starter blocklist import from the admin UI (no API key) |
+
+The app stores all data locally (SQLite + filesystem). No cloud database or
+third-party AI API is required beyond Twilio.
+
 ## Target hardware
 
 | Spec | Implication |
@@ -203,6 +217,8 @@ the Settings toggle off.
   whether recipients are configured)
 - Place a test call, then confirm the recording appears in the inbox — and, if SMS
   is configured, that each recipient receives an alert with a link to the message
+- Optional: confirm `https://voicemail.yourdomain.com/privacy-policy` and
+  `/terms-and-conditions` load (useful if Twilio or carriers ask for policy URLs)
 
 ## Hardening the admin surface (optional)
 
@@ -213,8 +229,8 @@ the Settings toggle off.
 
 ## Data and updates
 
-- Voicemail audio lives under `./data/recordings/YYYY/MM/DD/`; metadata and
-  settings in `./data/ivr.db`. Both persist across container restarts and image
-  updates because they are on the `./data` volume.
+- Voicemail audio lives under `./data/recordings/YYYY/MM/DD/`; metadata, contacts,
+  blocklist, and settings in `./data/ivr.db`. Both persist across container
+  restarts and image updates because they are on the `./data` volume.
 - To update: publish a new tag, update `IMAGE`, then re-run `./scripts/deploy.sh`.
 - `chmod 600 .env` and never commit it.
