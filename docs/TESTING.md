@@ -104,7 +104,7 @@ Complete each phase's checks before moving on.
 - [ ] Reloading Settings never pre-fills the password; leaving it blank keeps the saved password
 - [ ] A private/loopback SMTP host (e.g. `127.0.0.1`) is rejected on save
 - [ ] Contacts marked admin (with an email) receive Family mailbox alerts; a box-linked contact receives that box's alerts
-- [ ] A message in a child account's box emails the child and every parent account (deduped); a non-child box does not email parents
+- [ ] A message in a box flagged "Child mailbox" emails the box's linked contact plus each parent assigned to that box (deduped); a parent is not emailed for child mailboxes they aren't assigned, and a non-child box never emails parents
 - [ ] Connection page shows ON with the masked recipient list; "Send test email" delivers to each recipient
 - [ ] Leaving a voicemail emails each recipient a link to `/admin/messages/<id>`
 - [ ] With SMTP or recipients unconfigured, voicemail still saves and the callback returns 204
@@ -133,7 +133,7 @@ Complete each phase's checks before moving on.
 - [ ] Deleting a contact reverts the caller ID back to the raw number
 - [ ] VIP contact still hears the main menu and can pick a mailbox on a test call
 - [ ] Marking a contact admin or linking a box requires an email; a box can link to only one contact
-- [ ] Marking a contact as a parent requires an email; marking one as a child requires a linked voicemail box; Parent/Child badges show in the contacts list
+- [ ] Marking a contact as a parent requires an email; assigning child mailboxes requires the parent flag; Parent badge (contacts) and Child badge (contacts + boxes) render correctly
 
 ### Phase 4d.1 — Voicemail boxes
 

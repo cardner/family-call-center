@@ -17,7 +17,6 @@ def test_contacts_table_exists():
         "email",
         "is_admin",
         "is_parent",
-        "is_child",
         "box_id",
         "created_at",
         "updated_at",
@@ -47,7 +46,7 @@ def test_migrate_adds_email_fields_to_legacy_contacts():
 
         cols = _column_names(conn, "contacts")
 
-    assert {"email", "is_admin", "is_parent", "is_child", "box_id"} <= cols
+    assert {"email", "is_admin", "is_parent", "box_id"} <= cols
 
 
 def test_voicemail_boxes_table_exists():
@@ -60,9 +59,44 @@ def test_voicemail_boxes_table_exists():
         "voicemail_prompt",
         "voicemail_thanks",
         "notify_phone_numbers",
+        "is_child",
         "enabled",
         "sort_order",
     } <= cols
+
+
+def test_parent_child_links_table_exists():
+    with get_connection() as conn:
+        cols = _column_names(conn, "parent_child_links")
+    assert {"contact_id", "box_id"} <= cols
+
+
+def test_migrate_adds_is_child_to_legacy_boxes():
+    # A pre-child-mailbox boxes schema gains the is_child column on migration.
+    with get_connection() as conn:
+        conn.execute("DROP TABLE voicemail_boxes")
+        conn.execute(
+            """
+            CREATE TABLE voicemail_boxes (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug             TEXT    NOT NULL UNIQUE,
+                display_name     TEXT    NOT NULL,
+                extension_digit  TEXT    NOT NULL UNIQUE,
+                voicemail_prompt TEXT    NOT NULL DEFAULT '',
+                voicemail_thanks TEXT    NOT NULL DEFAULT '',
+                enabled          INTEGER NOT NULL DEFAULT 1,
+                sort_order       INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.commit()
+
+        _migrate_db(conn)
+        conn.commit()
+
+        cols = _column_names(conn, "voicemail_boxes")
+
+    assert "is_child" in cols
 
 
 def test_blocked_numbers_table_exists():

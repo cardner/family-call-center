@@ -37,6 +37,7 @@ _EDITABLE_COLUMNS = (
     "extension_digit",
     "voicemail_prompt",
     "voicemail_thanks",
+    "is_child",
     "enabled",
 )
 

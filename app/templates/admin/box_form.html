@@ -51,6 +51,16 @@
       {% for error in form.voicemail_thanks.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
+    {% if box['slug'] != 'family' %}
+    <div class="field">
+      <label class="label" for="is_child" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="is_child" name="is_child" type="checkbox" value="y" style="width:auto;" {{ 'checked' if form.is_child.data }} />
+        Child mailbox
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When enabled, messages left here also email the <strong>parent accounts</strong> assigned to this mailbox (managed per contact on the <a href="{{ url_for('admin.contacts') }}">Contacts page</a>).</p>
+    </div>
+    {% endif %}
+
     <p class="muted" style="font-size:0.8rem;">Email alerts for this box go to the contact linked to it on the <a href="{{ url_for('admin.contacts') }}">Contacts page</a>. The Family box notifies all admins.</p>
 
     <button type="submit" class="btn">Save box</button>

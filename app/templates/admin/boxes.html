@@ -14,7 +14,7 @@
     <tbody>
       {% for b in boxes %}
       <tr>
-        <td>{{ b['display_name'] }}</td>
+        <td>{{ b['display_name'] }}{% if b['is_child'] %} <span class="badge badge-info">Child</span>{% endif %}</td>
         <td>{{ b['extension_digit'] }}</td>
         <td>{% if b['enabled'] %}<span class="badge badge-pass">Enabled</span>{% else %}<span class="badge badge-fail">Disabled</span>{% endif %}</td>
         <td class="row" style="gap:0.5rem; border:none;">

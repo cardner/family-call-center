@@ -60,16 +60,23 @@
                style="width:auto;" {{ 'checked' if form.is_parent.data }} />
         Parent account
       </label>
-      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Parents are emailed whenever a message lands in <em>any</em> child account's mailbox.</p>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Parents are emailed whenever a message lands in one of the child mailboxes assigned to them below.</p>
+      {% for error in form.is_parent.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="field">
-      <label class="label" for="is_child" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
-        <input id="is_child" name="is_child" type="checkbox" value="y"
-               style="width:auto;" {{ 'checked' if form.is_child.data }} />
-        Child account
-      </label>
-      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When this contact's mailbox receives a message, every parent account is emailed too. Requires a linked voicemail box below.</p>
+      <label class="label" for="child_box_ids">Child mailboxes for this parent</label>
+      {% if form.child_box_ids.choices %}
+      <select class="input" id="child_box_ids" name="child_box_ids" multiple size="{{ form.child_box_ids.choices|length if form.child_box_ids.choices|length < 6 else 5 }}" style="max-width:360px;">
+        {% for value, label in form.child_box_ids.choices %}
+        <option value="{{ value }}" {{ 'selected' if value in form.child_box_ids.data }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Hold Ctrl/Cmd to select multiple. Only mailboxes flagged as a “Child mailbox” on the <a href="{{ url_for('admin.boxes') }}">Boxes page</a> appear here.</p>
+      {% else %}
+      <p class="muted" style="margin:0; font-size:0.8rem;">No child mailboxes yet. Mark a box as a “Child mailbox” on the <a href="{{ url_for('admin.boxes') }}">Boxes page</a> to assign it to a parent.</p>
+      {% endif %}
+      {% for error in form.child_box_ids.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <div class="field">

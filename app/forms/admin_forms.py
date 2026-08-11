@@ -12,6 +12,7 @@ from wtforms import (
     IntegerField,
     PasswordField,
     SelectField,
+    SelectMultipleField,
     StringField,
     SubmitField,
     TextAreaField,
@@ -160,6 +161,7 @@ class BoxForm(FlaskForm):
         "Thank-you message",
         validators=[Optional(), Length(max=IVR_TEXT_MAX_LENGTH)],
     )
+    is_child = BooleanField("Child mailbox")
     enabled = BooleanField("Enabled")
     submit = SubmitField("Save box")
 
@@ -193,12 +195,17 @@ class ContactForm(FlaskForm):
         validators=[Optional(), Length(max=EMAIL_MAX_LENGTH)],
     )
     is_admin = BooleanField("Receive Family mailbox notifications")
-    is_parent = BooleanField("Parent account (notified for all child mailboxes)")
-    is_child = BooleanField("Child account (their mailbox also notifies parents)")
+    is_parent = BooleanField("Parent account")
     # Choices are populated per-request in the route ("" = no linked box).
     box_id = SelectField(
         "Voicemail box",
         choices=[("", "— None —")],
+        validators=[Optional()],
+    )
+    # Child mailboxes this parent is notified for; choices set per-request.
+    child_box_ids = SelectMultipleField(
+        "Child mailboxes",
+        choices=[],
         validators=[Optional()],
     )
     submit = SubmitField("Save contact")
@@ -229,10 +236,10 @@ class ContactForm(FlaskForm):
                 "An email address is required for notification recipients."
             )
             ok = False
-        # A child account's alerts are routed through its linked mailbox.
-        if self.is_child.data and not self.box_id.data:
-            self.box_id.errors.append(
-                "Link a voicemail box to designate a child account."
+        # Child-mailbox assignments only make sense for a parent account.
+        if self.child_box_ids.data and not self.is_parent.data:
+            self.is_parent.errors.append(
+                "Enable “Parent account” to assign child mailboxes."
             )
             ok = False
         return ok

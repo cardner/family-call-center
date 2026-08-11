@@ -19,9 +19,9 @@ from app.utils.boxes import DEFAULT_BOX_SLUG
 from app.utils.db import (
     all_contacts,
     get_contact_by_box_id,
+    get_parent_contacts_for_box,
     list_admin_contacts,
     list_notification_contacts,
-    list_parent_contacts,
 )
 from app.utils.phone import last_ten, normalize_phone
 
@@ -179,30 +179,24 @@ def get_box_owner_email(box):
     return email or None
 
 
-def get_parent_notification_emails():
-    """Return deduped, valid emails for every parent contact."""
+def get_parent_emails_for_box(box):
+    """Return deduped, valid emails of the parents linked to a child mailbox."""
+    if box is None:
+        return []
     emails = []
-    for contact in list_parent_contacts():
+    for contact in get_parent_contacts_for_box(box["id"]):
         email = normalize_email(contact["email"])
         if email and email not in emails:
             emails.append(email)
     return emails
 
 
-def box_is_child_account(box):
-    """Return True if ``box`` is owned by a contact flagged as a child account."""
-    if box is None:
-        return False
-    contact = get_contact_by_box_id(box["id"])
-    return bool(contact is not None and contact["is_child"])
-
-
 def resolve_email_recipients(box):
     """Return the list of recipient emails for a voicemail in ``box``.
 
     The Family box (and a missing box) routes to all admins. Every other box
-    routes to the single contact linked to it; when that contact is a child
-    account, every parent account is added as well.
+    routes to the single contact linked to it; when the box is flagged as a
+    child mailbox, the parent accounts assigned to it are added as well.
     """
     if box is None or box["slug"] == DEFAULT_BOX_SLUG:
         return get_admin_notification_emails()
@@ -211,8 +205,8 @@ def resolve_email_recipients(box):
     owner_email = get_box_owner_email(box)
     if owner_email:
         recipients.append(owner_email)
-    if box_is_child_account(box):
-        for email in get_parent_notification_emails():
+    if box["is_child"]:
+        for email in get_parent_emails_for_box(box):
             if email not in recipients:
                 recipients.append(email)
     return recipients

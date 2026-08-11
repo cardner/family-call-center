@@ -80,6 +80,9 @@ leave a message in. Four boxes are set up out of the box:
   are routed through Contacts, not configured on the box itself.
 - A box can be **disabled**, which removes it from the menu and stops its digit
   from doing anything.
+- A box can be flagged as a **child mailbox**. Messages left in a child mailbox
+  also email the parent accounts assigned to it (see Contacts). The Family box
+  cannot be a child mailbox.
 - Every saved message is tagged with its box, shown in the inbox and on the
   message detail page, and filterable from the inbox.
 
@@ -104,11 +107,13 @@ appear everywhere a caller ID is shown (inbox, dashboard, message detail).
   (Cody, Ryan, Cory) to receive that box's alerts. An email is required whenever a
   contact is an admin, a parent, or a box owner. Each personal box can belong to
   only one contact. SMTP delivery is configured on the Settings page.
-- **Parent / child accounts**: mark a contact as a **parent account** to have
-  them emailed whenever a message lands in *any* child account's mailbox. Mark a
-  box-linked contact as a **child account** so that, in addition to the child
-  themselves, every parent account is notified about that box's messages. A child
-  account must be linked to a voicemail box.
+- **Parent / child accounts**: designate a **child mailbox** by ticking "Child
+  mailbox" on that box's edit page (Boxes → Edit). Then, on a contact, enable
+  **Parent account** and choose which child mailboxes that parent is notified for
+  under **Child mailboxes for this parent**. When a message lands in a child
+  mailbox, both the box's own linked contact *and* every parent assigned to it are
+  emailed. Each parent only receives alerts for the child mailboxes they are
+  assigned (the Family box is never a child mailbox).
 
 ## Blocklist
 

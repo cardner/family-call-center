@@ -16,7 +16,7 @@
     <tbody>
       {% for c in contacts %}
       <tr>
-        <td>{{ c['display_name'] }}{% if c['is_vip'] %} <span class="badge badge-info">VIP</span>{% endif %}{% if c['is_admin'] %} <span class="badge badge-pass">Admin</span>{% endif %}{% if c['is_parent'] %} <span class="badge badge-pass">Parent</span>{% endif %}{% if c['is_child'] %} <span class="badge badge-info">Child</span>{% endif %}{% if c['box_id'] and box_names.get(c['box_id']) %} <span class="badge badge-info">{{ box_names[c['box_id']] }} box</span>{% endif %}</td>
+        <td>{{ c['display_name'] }}{% if c['is_vip'] %} <span class="badge badge-info">VIP</span>{% endif %}{% if c['is_admin'] %} <span class="badge badge-pass">Admin</span>{% endif %}{% if c['is_parent'] %} <span class="badge badge-pass">Parent</span>{% endif %}{% if c['box_id'] and c['box_id'] in child_box_ids %} <span class="badge badge-info">Child</span>{% endif %}{% if c['box_id'] and box_names.get(c['box_id']) %} <span class="badge badge-info">{{ box_names[c['box_id']] }} box</span>{% endif %}</td>
         <td>{{ c['phone'] }}</td>
         <td class="muted">{{ c['email'] or '—' }}</td>
         <td class="row" style="gap:0.5rem; border:none;">

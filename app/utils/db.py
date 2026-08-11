@@ -52,7 +52,6 @@ def init_db():
                 email         TEXT    NOT NULL DEFAULT '',
                 is_admin      INTEGER NOT NULL DEFAULT 0,
                 is_parent     INTEGER NOT NULL DEFAULT 0,
-                is_child      INTEGER NOT NULL DEFAULT 0,
                 box_id        INTEGER,
                 created_at    TEXT    NOT NULL,
                 updated_at    TEXT    NOT NULL
@@ -76,8 +75,17 @@ def init_db():
                 voicemail_prompt     TEXT    NOT NULL DEFAULT '',
                 voicemail_thanks     TEXT    NOT NULL DEFAULT '',
                 notify_phone_numbers TEXT    NOT NULL DEFAULT '',
+                is_child             INTEGER NOT NULL DEFAULT 0,
                 enabled              INTEGER NOT NULL DEFAULT 1,
                 sort_order           INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        # Links a parent contact to the child mailbox(es) they are notified for.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS parent_child_links (
+                contact_id INTEGER NOT NULL,
+                box_id     INTEGER NOT NULL,
+                PRIMARY KEY (contact_id, box_id)
             )
         """)
         _migrate_db(conn)
@@ -136,17 +144,21 @@ def _migrate_db(conn):
         conn.execute(
             "ALTER TABLE contacts ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
         )
-    # Parent/child accounts: a parent is emailed for every child account's box.
+    # Parent accounts are emailed for the child mailboxes they are linked to.
     if "is_parent" not in contact_columns:
         conn.execute(
             "ALTER TABLE contacts ADD COLUMN is_parent INTEGER NOT NULL DEFAULT 0"
         )
-    if "is_child" not in contact_columns:
-        conn.execute(
-            "ALTER TABLE contacts ADD COLUMN is_child INTEGER NOT NULL DEFAULT 0"
-        )
     if "box_id" not in contact_columns:
         conn.execute("ALTER TABLE contacts ADD COLUMN box_id INTEGER")
+
+    # A voicemail box can be flagged as a "child" mailbox; messages there also
+    # notify the parent accounts linked to it via ``parent_child_links``.
+    box_columns = _column_names(conn, "voicemail_boxes")
+    if "is_child" not in box_columns:
+        conn.execute(
+            "ALTER TABLE voicemail_boxes ADD COLUMN is_child INTEGER NOT NULL DEFAULT 0"
+        )
     # A voicemail box maps to at most one contact. A partial UNIQUE index allows
     # many contacts with no box (NULL) while still preventing duplicate links.
     conn.execute(
@@ -392,7 +404,6 @@ def upsert_contact(
     is_admin=False,
     box_id=None,
     is_parent=False,
-    is_child=False,
 ):
     """Insert or update a contact keyed on the normalized phone number."""
     now = _utcnow_iso()
@@ -400,17 +411,16 @@ def upsert_contact(
         conn.execute(
             """
             INSERT INTO contacts (
-                phone, display_name, is_vip, email, is_admin, is_parent, is_child,
+                phone, display_name, is_vip, email, is_admin, is_parent,
                 box_id, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(phone) DO UPDATE SET
                 display_name = excluded.display_name,
                 is_vip       = excluded.is_vip,
                 email        = excluded.email,
                 is_admin     = excluded.is_admin,
                 is_parent    = excluded.is_parent,
-                is_child     = excluded.is_child,
                 box_id       = excluded.box_id,
                 updated_at   = excluded.updated_at
             """,
@@ -421,7 +431,6 @@ def upsert_contact(
                 email or "",
                 1 if is_admin else 0,
                 1 if is_parent else 0,
-                1 if is_child else 0,
                 box_id,
                 now,
                 now,
@@ -439,12 +448,47 @@ def list_admin_contacts():
         ).fetchall()
 
 
-def list_parent_contacts():
-    """Return parent contacts (they receive alerts for every child account box)."""
+def set_parent_child_links(contact_id, box_ids):
+    """Replace the child-mailbox links for a parent contact."""
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM parent_child_links WHERE contact_id = ?", (contact_id,)
+        )
+        seen = set()
+        for box_id in box_ids or ():
+            if box_id is None or box_id in seen:
+                continue
+            seen.add(box_id)
+            conn.execute(
+                "INSERT INTO parent_child_links (contact_id, box_id) VALUES (?, ?)",
+                (contact_id, box_id),
+            )
+        conn.commit()
+
+
+def get_parent_child_box_ids(contact_id):
+    """Return the child-mailbox ids a parent contact is linked to."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT box_id FROM parent_child_links WHERE contact_id = ?",
+            (contact_id,),
+        ).fetchall()
+    return [row["box_id"] for row in rows]
+
+
+def get_parent_contacts_for_box(box_id):
+    """Return the parent contacts linked to a child mailbox."""
+    if box_id is None:
+        return []
     with get_connection() as conn:
         return conn.execute(
-            "SELECT * FROM contacts WHERE is_parent = 1 "
-            "ORDER BY display_name COLLATE NOCASE ASC, id ASC"
+            """
+            SELECT c.* FROM contacts c
+            JOIN parent_child_links l ON l.contact_id = c.id
+            WHERE l.box_id = ?
+            ORDER BY c.display_name COLLATE NOCASE ASC, c.id ASC
+            """,
+            (box_id,),
         ).fetchall()
 
 
@@ -471,6 +515,9 @@ def list_notification_contacts():
 
 def delete_contact(contact_id):
     with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM parent_child_links WHERE contact_id = ?", (contact_id,)
+        )
         cursor = conn.execute("DELETE FROM contacts WHERE id = ?", (contact_id,))
         conn.commit()
         return cursor.rowcount > 0

@@ -63,12 +63,15 @@ from app.utils.db import (
     get_blocked,
     get_contact,
     get_contact_by_box_id,
+    get_contact_by_phone,
+    get_parent_child_box_ids,
     get_recording,
     list_blocked,
     list_contacts,
     list_recordings,
     mark_all_recordings_read,
     mark_recording_read,
+    set_parent_child_links,
     upsert_blocked,
     upsert_contact,
 )
@@ -378,12 +381,15 @@ def box_edit(box_id):
                 f"Digit {digit} is already used by {clash['display_name']}.", "error"
             )
         else:
+            # The shared Family mailbox routes to admins, so it is never a child.
+            is_child = 1 if form.is_child.data and row["slug"] != DEFAULT_BOX_SLUG else 0
             update_box(
                 box_id,
                 display_name=sanitize_text(form.display_name.data, 120),
                 extension_digit=digit,
                 voicemail_prompt=sanitize_ivr_text(form.voicemail_prompt.data or ""),
                 voicemail_thanks=sanitize_ivr_text(form.voicemail_thanks.data or ""),
+                is_child=is_child,
                 enabled=1 if form.enabled.data else 0,
             )
             flash("Voicemail box saved.", "success")
@@ -394,6 +400,7 @@ def box_edit(box_id):
         form.extension_digit.data = row["extension_digit"]
         form.voicemail_prompt.data = row["voicemail_prompt"]
         form.voicemail_thanks.data = row["voicemail_thanks"]
+        form.is_child.data = bool(row["is_child"])
         form.enabled.data = bool(row["enabled"])
 
     return render_template(
@@ -489,12 +496,15 @@ def contacts():
     offset = (page - 1) * per_page
 
     rows = list_contacts(limit=per_page, offset=offset)
-    box_names = {box["id"]: box["display_name"] for box in list_boxes()}
+    all_boxes = list_boxes()
+    box_names = {box["id"]: box["display_name"] for box in all_boxes}
+    child_box_ids = {box["id"] for box in all_boxes if box["is_child"]}
 
     return render_template(
         "admin/contacts.html",
         contacts=rows,
         box_names=box_names,
+        child_box_ids=child_box_ids,
         page=page,
         per_page=per_page,
         total=total,
@@ -513,6 +523,15 @@ def _contact_box_choices():
             continue
         choices.append((str(box["id"]), box["display_name"]))
     return choices
+
+
+def _child_box_choices():
+    """Voicemail boxes flagged as child mailboxes (assignable to a parent)."""
+    return [
+        (str(box["id"]), box["display_name"])
+        for box in list_boxes()
+        if box["is_child"] and box["slug"] != DEFAULT_BOX_SLUG
+    ]
 
 
 def _save_contact_from_form(form, current_contact_id=None):
@@ -535,8 +554,14 @@ def _save_contact_from_form(form, current_contact_id=None):
         is_admin=form.is_admin.data,
         box_id=box_id,
         is_parent=form.is_parent.data,
-        is_child=form.is_child.data,
     )
+    # Persist the parent -> child-mailbox links (only meaningful for parents).
+    saved = get_contact_by_phone(form.phone.data)
+    if saved is not None:
+        link_ids = (
+            [int(v) for v in form.child_box_ids.data] if form.is_parent.data else []
+        )
+        set_parent_child_links(saved["id"], link_ids)
     flash("Contact saved.", "success")
     return True
 
@@ -546,6 +571,7 @@ def _save_contact_from_form(form, current_contact_id=None):
 def contact_new():
     form = ContactForm()
     form.box_id.choices = _contact_box_choices()
+    form.child_box_ids.choices = _child_box_choices()
     if form.validate_on_submit() and _save_contact_from_form(form):
         return redirect(url_for("admin.contacts"))
 
@@ -566,6 +592,7 @@ def contact_edit(contact_id):
 
     form = ContactForm()
     form.box_id.choices = _contact_box_choices()
+    form.child_box_ids.choices = _child_box_choices()
     if form.validate_on_submit() and _save_contact_from_form(
         form, current_contact_id=contact_id
     ):
@@ -578,7 +605,7 @@ def contact_edit(contact_id):
         form.email.data = row["email"]
         form.is_admin.data = bool(row["is_admin"])
         form.is_parent.data = bool(row["is_parent"])
-        form.is_child.data = bool(row["is_child"])
+        form.child_box_ids.data = [str(b) for b in get_parent_child_box_ids(contact_id)]
         form.box_id.data = str(row["box_id"]) if row["box_id"] else ""
 
     return render_template(

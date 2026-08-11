@@ -1,6 +1,6 @@
 import app.utils.notify as notify
-from app.utils.boxes import get_box_by_slug
-from app.utils.db import upsert_contact
+from app.utils.boxes import get_box_by_slug, update_box
+from app.utils.db import get_contact_by_phone, set_parent_child_links, upsert_contact
 from app.utils.settings import set_smtp_setting
 
 
@@ -86,14 +86,12 @@ def test_notify_new_message_personal_box_goes_to_owner(app):
 def test_notify_new_message_child_box_also_emails_parents(app):
     _configure_smtp()
     cody = get_box_by_slug("cody")
+    update_box(cody["id"], is_child=1)
+    cody = get_box_by_slug("cody")
     upsert_contact("+15550000009", "Ryan", is_parent=True, email="ryan@example.com")
-    upsert_contact(
-        "+15550000010",
-        "Cody",
-        email="cody@example.com",
-        box_id=cody["id"],
-        is_child=True,
-    )
+    parent = get_contact_by_phone("+15550000009")
+    set_parent_child_links(parent["id"], [cody["id"]])
+    upsert_contact("+15550000010", "Cody", email="cody@example.com", box_id=cody["id"])
 
     store = []
     results = notify.notify_new_message(

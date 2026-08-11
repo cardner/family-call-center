@@ -58,9 +58,9 @@ messages and IVR prompts, and an automated test suite.
 - **Email notifications** — optional email alert with a link to the message when a
   voicemail is saved, sent through Fastmail SMTP. Recipients are derived from
   Contacts: admins receive Family mailbox alerts, and each personal box notifies its
-  linked contact. **Parent accounts** are additionally emailed for every **child
-  account** mailbox. SMTP credentials are stored encrypted and edited from Settings
-  (no redeploy).
+  linked contact. A box can be flagged a **child mailbox**, and **parent accounts**
+  are additionally emailed for the child mailboxes assigned to them. SMTP credentials
+  are stored encrypted and edited from Settings (no redeploy).
 - **Voicemail transcription** — Twilio built-in speech-to-text (billed to your
   Twilio account). Transcripts are searchable and shown in the inbox.
 

@@ -1,16 +1,21 @@
 import io
 
-from app.utils.boxes import get_box_by_slug
+from app.utils.boxes import get_box_by_slug, update_box
 from app.utils.contacts import (
     get_admin_notification_emails,
-    get_parent_notification_emails,
     is_valid_email,
     mask_email,
     parse_contacts_csv,
     resolve_caller_display,
     resolve_email_recipients,
 )
-from app.utils.db import count_contacts, get_contact_by_phone, upsert_contact
+from app.utils.db import (
+    count_contacts,
+    get_contact_by_phone,
+    get_parent_child_box_ids,
+    set_parent_child_links,
+    upsert_contact,
+)
 from app.utils.phone import normalize_phone
 
 
@@ -185,57 +190,60 @@ def test_resolve_recipients_family_vs_box(app):
     assert resolve_email_recipients(cody) == ["cody@example.com"]
 
 
-def test_parent_emails_deduped_and_validated(app):
-    upsert_contact(
-        "+15550000001", "Ryan", is_parent=True, email="ryan@example.com"
-    )
-    upsert_contact("+15550000002", "NoEmail", is_parent=True, email="")
-    assert get_parent_notification_emails() == ["ryan@example.com"]
+def _make_child_box(slug):
+    """Flag a box as a child mailbox and return the refreshed row."""
+    box = get_box_by_slug(slug)
+    update_box(box["id"], is_child=1)
+    return get_box_by_slug(slug)
 
 
-def test_child_box_notifies_parents(app):
-    cody = get_box_by_slug("cody")
+def test_child_box_notifies_linked_parents(app):
+    cody = _make_child_box("cody")
     upsert_contact("+15550000001", "Ryan", is_parent=True, email="ryan@example.com")
-    upsert_contact(
-        "+15550000002",
-        "Cody",
-        email="cody@example.com",
-        box_id=cody["id"],
-        is_child=True,
-    )
-    # The child owner plus every parent are notified for the child's box.
+    parent = get_contact_by_phone("+15550000001")
+    set_parent_child_links(parent["id"], [cody["id"]])
+    upsert_contact("+15550000002", "Cody", email="cody@example.com", box_id=cody["id"])
+
+    # The child (box owner) plus each linked parent are notified.
     assert resolve_email_recipients(cody) == ["cody@example.com", "ryan@example.com"]
 
 
-def test_non_child_box_does_not_notify_parents(app):
-    cody = get_box_by_slug("cody")
+def test_parent_only_gets_their_assigned_children(app):
+    cody = _make_child_box("cody")
+    cory = _make_child_box("cory")
     upsert_contact("+15550000001", "Ryan", is_parent=True, email="ryan@example.com")
+    parent = get_contact_by_phone("+15550000001")
+    # Ryan is only assigned Cody's mailbox, not Cory's.
+    set_parent_child_links(parent["id"], [cody["id"]])
+
+    assert resolve_email_recipients(cody) == ["ryan@example.com"]
+    assert resolve_email_recipients(cory) == []
+
+
+def test_non_child_box_does_not_notify_parents(app):
+    cody = get_box_by_slug("cody")  # not flagged as a child mailbox
+    upsert_contact("+15550000001", "Ryan", is_parent=True, email="ryan@example.com")
+    parent = get_contact_by_phone("+15550000001")
+    set_parent_child_links(parent["id"], [cody["id"]])
     upsert_contact("+15550000002", "Cody", email="cody@example.com", box_id=cody["id"])
+
     assert resolve_email_recipients(cody) == ["cody@example.com"]
 
 
-def test_child_box_notifies_parents_without_owner_email(app):
-    cody = get_box_by_slug("cody")
-    upsert_contact("+15550000001", "Ryan", is_parent=True, email="ryan@example.com")
-    upsert_contact("+15550000002", "Cody", box_id=cody["id"], is_child=True)
-    assert resolve_email_recipients(cody) == ["ryan@example.com"]
-
-
 def test_child_parent_overlap_deduped(app):
-    cody = get_box_by_slug("cody")
-    # A parent who also owns the child box should only appear once.
-    upsert_contact(
-        "+15550000002",
-        "Cody",
-        email="cody@example.com",
-        box_id=cody["id"],
-        is_child=True,
-    )
+    cody = _make_child_box("cody")
+    upsert_contact("+15550000002", "Cody", email="cody@example.com", box_id=cody["id"])
+    # A parent who happens to share the owner's email appears only once.
     upsert_contact("+15550000001", "Cody2", is_parent=True, email="cody@example.com")
+    parent = get_contact_by_phone("+15550000001")
+    set_parent_child_links(parent["id"], [cody["id"]])
+
     assert resolve_email_recipients(cody) == ["cody@example.com"]
 
 
 def test_contact_create_parent_via_admin(auth_client):
+    cody = get_box_by_slug("cody")
+    update_box(cody["id"], is_child=1)
     resp = auth_client.post(
         "/admin/contacts/new",
         data={
@@ -243,20 +251,25 @@ def test_contact_create_parent_via_admin(auth_client):
             "display_name": "Ryan",
             "email": "ryan@example.com",
             "is_parent": "y",
+            "child_box_ids": [str(cody["id"])],
         },
     )
     assert resp.status_code == 302
-    assert bool(get_contact_by_phone("+15551234567")["is_parent"]) is True
+    row = get_contact_by_phone("+15551234567")
+    assert bool(row["is_parent"]) is True
+    assert get_parent_child_box_ids(row["id"]) == [cody["id"]]
 
 
-def test_contact_child_requires_box(auth_client):
+def test_child_box_assignment_requires_parent_flag(auth_client):
+    cody = get_box_by_slug("cody")
+    update_box(cody["id"], is_child=1)
     resp = auth_client.post(
         "/admin/contacts/new",
         data={
             "phone": "5551234567",
-            "display_name": "Cody",
-            "email": "cody@example.com",
-            "is_child": "y",
+            "display_name": "Ryan",
+            "email": "ryan@example.com",
+            "child_box_ids": [str(cody["id"])],
         },
     )
     assert resp.status_code == 200  # re-renders with an error
