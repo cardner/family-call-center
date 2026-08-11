@@ -10,7 +10,6 @@ def valid_settings(**overrides):
         "voicemail_thanks": "Thank you, goodbye.",
         "max_recording_seconds": "200",
         "ivr_voice": "Google.en-US-Neural2-D",
-        "notify_phone_numbers": "",
         "block_action": "reject",
         "blocked_caller_message": "This number is not accepting calls. Goodbye.",
     }

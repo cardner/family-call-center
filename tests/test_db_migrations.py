@@ -10,7 +10,44 @@ def test_recordings_has_new_columns():
 def test_contacts_table_exists():
     with get_connection() as conn:
         cols = _column_names(conn, "contacts")
-    assert {"phone", "display_name", "is_vip", "created_at", "updated_at"} <= cols
+    assert {
+        "phone",
+        "display_name",
+        "is_vip",
+        "email",
+        "is_admin",
+        "is_parent",
+        "is_child",
+        "box_id",
+        "created_at",
+        "updated_at",
+    } <= cols
+
+
+def test_migrate_adds_email_fields_to_legacy_contacts():
+    # A pre-email contacts schema (only through is_vip) gains the new columns.
+    with get_connection() as conn:
+        conn.execute("DROP TABLE contacts")
+        conn.execute(
+            """
+            CREATE TABLE contacts (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone        TEXT    NOT NULL UNIQUE,
+                display_name TEXT    NOT NULL,
+                is_vip       INTEGER NOT NULL DEFAULT 0,
+                created_at   TEXT    NOT NULL,
+                updated_at   TEXT    NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+        _migrate_db(conn)
+        conn.commit()
+
+        cols = _column_names(conn, "contacts")
+
+    assert {"email", "is_admin", "is_parent", "is_child", "box_id"} <= cols
 
 
 def test_voicemail_boxes_table_exists():

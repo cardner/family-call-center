@@ -201,7 +201,7 @@ def voicemail_callback():
             box_id=box_id,
         )
 
-        # Best-effort SMS alert to the box's recipients; never fatal.
+        # Best-effort email alert to the box's recipients; never fatal.
         notify_new_message(
             message_id=message_id,
             caller_id=caller_id,

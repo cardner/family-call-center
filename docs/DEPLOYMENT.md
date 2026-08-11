@@ -20,7 +20,7 @@ shared Docker network. Twilio webhooks and the admin UI share one hostname
 | Service | Required | Purpose |
 |---------|----------|---------|
 | Twilio Voice | yes | Incoming calls, IVR, voicemail recording, neural TTS |
-| Twilio SMS | optional | Voicemail alert texts to configured recipients |
+| Fastmail SMTP | optional | Voicemail alert emails to configured recipients |
 | Twilio Transcription | optional | Speech-to-text on recordings (Settings toggle) |
 | Nginx Proxy Manager | yes (this guide) | HTTPS reverse proxy |
 | 1Password CLI | optional | Secret injection on the NAS (`op inject` / `op run`) |
@@ -54,15 +54,18 @@ the resulting reference (for example `ghcr.io/youruser/family-call-center:v1.0.0
 ## 2. Prepare secrets in 1Password
 
 Create items in a vault (the template assumes a vault named `Family-Call-Center`)
-holding the Twilio credentials, a Flask secret key, and the admin password. Then
-edit [`.env.op.template`](../.env.op.template) so each `op://` reference points at
-your actual vault, item, and field names.
+holding the Twilio credentials, a Flask secret key, the admin password, and (for
+email notifications) a settings encryption key. Then edit
+[`.env.op.template`](../.env.op.template) so each `op://` reference points at your
+actual vault, item, and field names.
 
-Generate a strong Flask secret key and an admin password hash:
+Generate a strong Flask secret key, an admin password hash, and a settings
+encryption key:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"                        # FLASK_SECRET_KEY
 python -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('your-admin-password'))"  # ADMIN_PASSWORD_HASH
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # SETTINGS_ENCRYPTION_KEY
 ```
 
 Prefer storing `ADMIN_PASSWORD_HASH` over a plaintext `ADMIN_PASSWORD` in
@@ -136,44 +139,53 @@ The other endpoints (`/voicemail`, `/voicemail/done`, `/voicemail/callback`,
 (Family, Cody, Ryan, Cory) by keypad digit — no extra Twilio numbers or webhooks
 are needed.
 
-## 6a. Configure SMS notifications (Twilio Console)
+## 6a. Configure email notifications (Fastmail SMTP)
 
-SMS alerts are optional. When a voicemail is saved, the app texts a link to the
-message to each recipient you configure. Alerts are **outbound only** — no new
-Twilio webhook URLs are required, and the existing Twilio credentials are reused
-as the sender. Recipient numbers are set in the admin UI, not in `.env`.
+Email alerts are optional. When a voicemail is saved, the app emails a link to
+the message to each configured recipient through Fastmail SMTP. Alerts are
+**outbound only** — no inbound mail, webhooks, or Twilio SMS is involved.
+Recipients are derived from Contacts (admins get Family messages; each personal
+box notifies its linked contact), and the SMTP credentials are entered in the
+admin UI, not in `.env`.
 
-1. **Confirm the number can send SMS.** In the [Twilio Console](https://console.twilio.com),
-   go to **Phone Numbers → Manage → Active numbers**, open the number that matches
-   `TWILIO_PHONE_NUMBER`, and check that both **Voice** and **SMS** capabilities are
-   enabled. Recipients will see texts coming from this number.
-2. **Trial accounts: verify each recipient.** On a trial account Twilio only
-   delivers SMS to [verified caller IDs](https://www.twilio.com/docs/messaging/guides/how-to-use-your-free-trial-account).
-   Add every family member's number under **Phone Numbers → Manage → Verified
-   Caller IDs** and complete verification on each device. Skip this once the
-   account is upgraded to paid.
-3. **Enable geographic permissions.** Under **Messaging → Settings → Geo
-   permissions**, enable SMS for the countries where recipients live (e.g. United
-   States). Twilio rejects sends to disabled regions.
-4. **US numbers: register A2P 10DLC.** For US local numbers texting US mobiles,
-   complete [A2P 10DLC registration](https://www.twilio.com/docs/messaging/compliance/a2p-10dlc):
-   register a Brand, register a Campaign (transactional notifications), and link
-   your phone number. Approval can take 1–15 business days; unregistered traffic is
-   often filtered. Toll-free numbers use **Toll-Free Verification** instead.
-5. **Add recipients in the admin UI.** Log in at
-   `https://voicemail.yourdomain.com/admin/settings`, enter numbers in the **SMS
-   notification recipients** field (E.164 format, one per line or comma-separated),
-   and save. No container restart is needed. These are the default recipients; to
-   text different people per mailbox, set recipients on each box under
-   **Voicemail boxes** (`/admin/boxes`) — a box with its own recipients overrides
-   the default list.
-6. **Test delivery.** Open the Connection page and click **Send test SMS**; each
-   recipient should receive a message within seconds.
+1. **Set the encryption key.** SMTP credentials are encrypted at rest with a
+   Fernet key that lives only in the environment. Generate one:
 
-You do **not** need a Messaging Service, an inbound SMS webhook, a status callback
-URL, or new API keys for this. Outbound SMS is billed per
-[Twilio SMS pricing](https://www.twilio.com/en-us/pricing) segment, one message per
-recipient per voicemail.
+   ```bash
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   ```
+
+   Set it as `SETTINGS_ENCRYPTION_KEY` in `.env` (or store it in 1Password and
+   reference it from `.env.op.template`). Restart the container so the app picks
+   it up. Without this key the Settings page cannot save SMTP details and email
+   stays disabled.
+2. **Create a Fastmail app password.** In Fastmail, go to **Settings → Privacy &
+   Security → App passwords** and create a new
+   [app password](https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords)
+   scoped to **Mail (SMTP)** only. Copy the generated password — you cannot view
+   it again later.
+3. **Enter SMTP settings in the admin UI.** Log in at
+   `https://voicemail.yourdomain.com/admin/settings` and fill in the **Email
+   notifications** section:
+   - **SMTP host:** `smtp.fastmail.com`
+   - **Security:** SSL (port 465) — or STARTTLS (port 587)
+   - **SMTP username:** your full Fastmail address (e.g. `you@yourdomain.com`)
+   - **SMTP password:** the app password from step 2
+   - **From address:** optional; leave blank to send from the username
+
+   Save. No container restart is needed; the credentials are encrypted before
+   they are written to the database.
+4. **Choose recipients on the Contacts page.** Open `/admin/contacts` and give
+   each recipient an **email address**. Mark family members who should receive
+   shared **Family** mailbox alerts as **admins**, and link a contact to a
+   personal box (Cody, Ryan, Cory) to route that box's alerts to them.
+5. **Test delivery.** Open the Connection page and click **Send test email**;
+   each configured recipient should receive a message within seconds.
+
+Fastmail is a personal mailbox provider, not a bulk sender — family-scale volume
+is fine, but its normal sending limits apply. Rotating `SETTINGS_ENCRYPTION_KEY`
+invalidates the stored SMTP settings; re-enter them on the Settings page after a
+key change.
 
 ## 6b. Enable voicemail transcription (Twilio Console)
 
@@ -218,9 +230,9 @@ the Settings toggle off.
 
 - `curl https://voicemail.yourdomain.com/health` → `{"status":"ok",...}`
 - Log in at `https://voicemail.yourdomain.com/admin/login`
-- Open the Connection page and run diagnostics (the SMS notifications check reports
-  whether recipients are configured)
-- Place a test call, then confirm the recording appears in the inbox — and, if SMS
+- Open the Connection page and run diagnostics (the email notifications check reports
+  whether SMTP and recipients are configured)
+- Place a test call, then confirm the recording appears in the inbox — and, if email
   is configured, that each recipient receives an alert with a link to the message
 - Optional: confirm `https://voicemail.yourdomain.com/privacy-policy` and
   `/terms-and-conditions` load (useful if Twilio or carriers ask for policy URLs)

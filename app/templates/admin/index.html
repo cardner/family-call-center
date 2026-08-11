@@ -31,7 +31,7 @@
     <p style="margin:0.75rem 0 0;"><a class="btn btn-outline btn-sm" href="{{ url_for('admin.connection') }}">Run diagnostics</a></p>
   </div>
   <div class="card" style="flex:1; min-width:200px;">
-    <h3>SMS notifications</h3>
+    <h3>Email notifications</h3>
     <p style="margin:0.5rem 0 0;">
       <span class="badge badge-{{ 'pass' if notifications.enabled else 'info' }}">{{ 'ON' if notifications.enabled else 'OFF' }}</span>
       {% if notifications.enabled %}<span class="muted" style="font-size:0.8rem;">{{ notifications.recipient_count }} recipient(s)</span>{% endif %}

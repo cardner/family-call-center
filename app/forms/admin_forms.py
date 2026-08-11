@@ -18,16 +18,19 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Length, NumberRange, Optional, ValidationError
 
-from app.utils.contacts import CONTACT_NAME_MAX_LENGTH
+from app.utils.contacts import (
+    CONTACT_NAME_MAX_LENGTH,
+    EMAIL_MAX_LENGTH,
+    is_valid_email,
+)
 from app.utils.phone import normalize_phone
 from app.utils.settings import (
     BLOCK_ACTIONS,
     IVR_TEXT_MAX_LENGTH,
     MAX_RECORDING_SECONDS_MAX,
     MAX_RECORDING_SECONDS_MIN,
-    NOTIFY_PHONE_NUMBERS_MAX_LENGTH,
-    is_valid_e164,
-    parse_phone_numbers,
+    SMTP_TEXT_MAX_LENGTH,
+    is_valid_smtp_host,
 )
 
 # Notes on blocked numbers are short labels like "robocaller" or "wrong number".
@@ -77,12 +80,30 @@ class SettingsForm(FlaskForm):
             NumberRange(min=MAX_RECORDING_SECONDS_MIN, max=MAX_RECORDING_SECONDS_MAX),
         ],
     )
-    notify_phone_numbers = TextAreaField(
-        "SMS notification recipients",
-        validators=[Optional(), Length(max=NOTIFY_PHONE_NUMBERS_MAX_LENGTH)],
-    )
     transcription_enabled = BooleanField("Enable voicemail transcription")
     personalized_greeting_enabled = BooleanField("Enable personalized greetings")
+    smtp_host = StringField(
+        "SMTP host",
+        validators=[Optional(), Length(max=SMTP_TEXT_MAX_LENGTH)],
+    )
+    smtp_port = SelectField(
+        "SMTP security",
+        choices=[("465", "SSL (port 465)"), ("587", "STARTTLS (port 587)")],
+        default="465",
+        validators=[Optional()],
+    )
+    smtp_user = StringField(
+        "SMTP username",
+        validators=[Optional(), Length(max=SMTP_TEXT_MAX_LENGTH)],
+    )
+    smtp_password = PasswordField(
+        "SMTP password",
+        validators=[Optional(), Length(max=255)],
+    )
+    smtp_from = StringField(
+        "From address",
+        validators=[Optional(), Length(max=SMTP_TEXT_MAX_LENGTH)],
+    )
     block_action = SelectField(
         "Blocked caller handling",
         choices=[
@@ -102,19 +123,21 @@ class SettingsForm(FlaskForm):
         if field.data not in BLOCK_ACTIONS:
             raise ValidationError("Invalid blocked caller handling option.")
 
-    def validate_notify_phone_numbers(self, field):
-        """Reject the whole field if any entry is not valid E.164."""
-        invalid = [
-            number
-            for number in parse_phone_numbers(field.data)
-            if not is_valid_e164(number)
-        ]
-        if invalid:
+    def validate_smtp_host(self, field):
+        if field.data and not is_valid_smtp_host(field.data):
             raise ValidationError(
-                "Invalid phone number(s): "
-                + ", ".join(invalid)
-                + ". Use E.164 format, e.g. +15551234567."
+                "Enter a valid mail server hostname, e.g. smtp.fastmail.com."
             )
+
+    def validate_smtp_user(self, field):
+        if field.data and not is_valid_email(field.data):
+            raise ValidationError(
+                "The SMTP username should be your full Fastmail email address."
+            )
+
+    def validate_smtp_from(self, field):
+        if field.data and not is_valid_email(field.data):
+            raise ValidationError("Enter a valid From email address.")
 
 
 class BoxForm(FlaskForm):
@@ -137,26 +160,8 @@ class BoxForm(FlaskForm):
         "Thank-you message",
         validators=[Optional(), Length(max=IVR_TEXT_MAX_LENGTH)],
     )
-    notify_phone_numbers = TextAreaField(
-        "SMS notification recipients",
-        validators=[Optional(), Length(max=NOTIFY_PHONE_NUMBERS_MAX_LENGTH)],
-    )
     enabled = BooleanField("Enabled")
     submit = SubmitField("Save box")
-
-    def validate_notify_phone_numbers(self, field):
-        """Reject the whole field if any entry is not valid E.164."""
-        invalid = [
-            number
-            for number in parse_phone_numbers(field.data)
-            if not is_valid_e164(number)
-        ]
-        if invalid:
-            raise ValidationError(
-                "Invalid phone number(s): "
-                + ", ".join(invalid)
-                + ". Use E.164 format, e.g. +15551234567."
-            )
 
 
 class DeleteMessageForm(FlaskForm):
@@ -183,6 +188,19 @@ class ContactForm(FlaskForm):
         validators=[DataRequired(), Length(max=CONTACT_NAME_MAX_LENGTH)],
     )
     is_vip = BooleanField("VIP contact (bypasses blocklist)")
+    email = StringField(
+        "Email address",
+        validators=[Optional(), Length(max=EMAIL_MAX_LENGTH)],
+    )
+    is_admin = BooleanField("Receive Family mailbox notifications")
+    is_parent = BooleanField("Parent account (notified for all child mailboxes)")
+    is_child = BooleanField("Child account (their mailbox also notifies parents)")
+    # Choices are populated per-request in the route ("" = no linked box).
+    box_id = SelectField(
+        "Voicemail box",
+        choices=[("", "— None —")],
+        validators=[Optional()],
+    )
     submit = SubmitField("Save contact")
 
     def validate_phone(self, field):
@@ -193,6 +211,31 @@ class ContactForm(FlaskForm):
             )
         # Expose the normalized form so the handler can store it directly.
         field.data = normalized
+
+    def validate_email(self, field):
+        if field.data and not is_valid_email(field.data):
+            raise ValidationError("Enter a valid email address, e.g. you@example.com.")
+
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators):
+            return False
+        ok = True
+        # A recipient needs somewhere to send: require an email whenever the
+        # contact is an admin/parent or is linked to a voicemail box.
+        if (
+            self.is_admin.data or self.is_parent.data or self.box_id.data
+        ) and not self.email.data:
+            self.email.errors.append(
+                "An email address is required for notification recipients."
+            )
+            ok = False
+        # A child account's alerts are routed through its linked mailbox.
+        if self.is_child.data and not self.box_id.data:
+            self.box_id.errors.append(
+                "Link a voicemail box to designate a child account."
+            )
+            ok = False
+        return ok
 
 
 class DeleteContactForm(FlaskForm):
@@ -272,6 +315,6 @@ class ConnectionTestForm(FlaskForm):
 
 
 class NotificationTestForm(FlaskForm):
-    """CSRF-only form for sending a test SMS notification."""
+    """CSRF-only form for sending a test email notification."""
 
-    submit = SubmitField("Send test SMS")
+    submit = SubmitField("Send test email")

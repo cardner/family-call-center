@@ -19,7 +19,7 @@ messages and IVR prompts, and an automated test suite.
 - **Voicemail IVR** — Twilio voice webhooks with request-signature verification.
 - **Per-recipient voicemail boxes** — a single menu routes callers to one of four
   mailboxes (Family, Cody, Ryan, Cory) by keypad digit, each with its own optional
-  prompt, thank-you message, and SMS recipients, and its own inbox filter.
+  prompt, thank-you message, and its own inbox filter.
 - **Configurable prompts** — main menu greeting, invalid-input message, and default
   voicemail prompt/thank-you message stored in SQLite and editable from the admin UI
   (no redeploy needed). The menu's "press N" options are generated from your boxes.
@@ -39,24 +39,28 @@ messages and IVR prompts, and an automated test suite.
 ### Admin UI (`/admin`)
 
 - Session login with idle and absolute session timeouts.
-- **Dashboard** — message count, unread count, SMS notification status, last
+- **Dashboard** — message count, unread count, email notification status, last
   connection-test result.
 - **Messages inbox** — paginated list with search (caller ID, transcript, contact
   name), per-box filtering, audio playback, delete, and read/unread tracking.
-- **Voicemail boxes** — edit each mailbox's prompt, thank-you message, menu digit,
-  and SMS recipients.
-- **Contacts** — phone → display name address book with CSV import.
+- **Voicemail boxes** — edit each mailbox's prompt, thank-you message, and menu digit.
+- **Contacts** — phone → display name address book with CSV import, plus per-contact
+  email, admin flag, and voicemail-box link that drive email notification routing.
 - **Blocklist** — manage blocked numbers and optional CallShield starter import.
 - **Settings** — edit prompts, IVR voice, max recording length, transcription,
-  personalized greetings, blocked-caller handling, and SMS recipients.
+  personalized greetings, blocked-caller handling, and Fastmail SMTP credentials.
 - **Connection diagnostics** — Twilio ↔ app health checks, webhook URL list,
-  test SMS, and copy-ready configuration.
+  test email, and copy-ready configuration.
 - **Responsive layout** — collapsible hamburger navigation on mobile.
 
 ### Notifications and transcription
 
-- **SMS notifications** — optional text alert with a link to the message when a
-  voicemail is saved. Recipients are managed from Settings (no redeploy).
+- **Email notifications** — optional email alert with a link to the message when a
+  voicemail is saved, sent through Fastmail SMTP. Recipients are derived from
+  Contacts: admins receive Family mailbox alerts, and each personal box notifies its
+  linked contact. **Parent accounts** are additionally emailed for every **child
+  account** mailbox. SMTP credentials are stored encrypted and edited from Settings
+  (no redeploy).
 - **Voicemail transcription** — Twilio built-in speech-to-text (billed to your
   Twilio account). Transcripts are searchable and shown in the inbox.
 
@@ -76,23 +80,24 @@ messages and IVR prompts, and an automated test suite.
 
 A pytest suite covering IVR, voicemail, auth, CSRF, rate limiting, validation,
 output encoding, messages, transcription, read/unread, contacts, blocklist,
-personalized greetings, call policy, settings, connection diagnostics, SMS
-notifications, legal pages, and SSML/voice handling.
+personalized greetings, call policy, settings, connection diagnostics, email
+notifications, settings encryption, legal pages, and SSML/voice handling.
 
 ## Integrations
 
 | Integration | Role |
 |-------------|------|
 | [Twilio Voice](https://www.twilio.com/voice) | Incoming calls, IVR TwiML, voicemail recording, neural TTS |
-| [Twilio SMS](https://www.twilio.com/messaging) | Outbound voicemail alerts to configured recipients |
+| [Fastmail SMTP](https://www.fastmail.com/) | Outbound voicemail alert emails to configured recipients |
 | [Twilio Transcription](https://www.twilio.com/docs/voice/twiml/record#attributes-transcribe) | Optional speech-to-text on recordings (`<Record transcribe>`) |
 | [Nginx Proxy Manager](https://nginxproxymanager.com/) | HTTPS termination and reverse proxy to the container |
 | [1Password CLI](https://developer.1password.com/docs/cli/) | Secret injection for Docker deployments (`op inject` / `op run`) |
 | [Basecoat](https://basecoatui.com/) | Admin UI component styling (vendored at build time) |
 | [CallShield](https://github.com/SysAdminDoc/CallShield) | Optional starter blocklist import (MIT, FCC/FTC-sourced numbers) |
 
-Twilio is the only runtime external API the app calls. Everything else is
-self-hosted infrastructure or vendored assets.
+Twilio (call handling) and Fastmail SMTP (notification email) are the only
+runtime external services the app contacts. Everything else is self-hosted
+infrastructure or vendored assets.
 
 ## Dependencies
 
@@ -107,6 +112,7 @@ self-hosted infrastructure or vendored assets.
 | gunicorn | Production WSGI server (Docker) |
 | Flask-WTF | CSRF protection and form handling |
 | Flask-Limiter | Login and diagnostics rate limiting |
+| cryptography | Fernet encryption for SMTP credentials at rest |
 
 See [`requirements.txt`](requirements.txt). Dev/test extras in
 [`requirements-dev.txt`](requirements-dev.txt) (pytest, pytest-cov).
@@ -181,6 +187,7 @@ Configured via `.env` (see [`.env.template`](.env.template), or
 | `TWILIO_PHONE_NUMBER` | yes | The Twilio number, e.g. `+15550001111` |
 | `BASE_URL` | yes | Public HTTPS URL Twilio/admin reach (no trailing slash) |
 | `FLASK_SECRET_KEY` | yes | Session signing key |
+| `SETTINGS_ENCRYPTION_KEY` | no** | Fernet key encrypting Fastmail SMTP credentials at rest; required before email notifications can be configured |
 | `ADMIN_USERNAME` | no (default `admin`) | Admin login username |
 | `ADMIN_PASSWORD` | yes* | Admin password (plaintext) |
 | `ADMIN_PASSWORD_HASH` | yes* | Werkzeug password hash; takes precedence over `ADMIN_PASSWORD` |
@@ -191,6 +198,10 @@ Configured via `.env` (see [`.env.template`](.env.template), or
 
 \* Provide either `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` (hash preferred in
 production).
+
+\*\* Optional for the app to boot, but email notifications stay disabled until it
+is set. Generate with `python -c "from cryptography.fernet import Fernet;
+print(Fernet.generate_key().decode())"`.
 
 Docker-only variables (`IMAGE`, `NPM_NETWORK`) are documented in
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
@@ -228,9 +239,11 @@ The app generates TwiML that chains the other endpoints (`/call/route`,
 `/voicemail`, `/voicemail/done`, `/voicemail/callback`, `/voicemail/transcribe`).
 You only configure `/call` in the Twilio Console.
 
-To enable SMS notifications for new voicemails, follow the Twilio Console steps in
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (SMS capability, trial verification, and
-US A2P 10DLC), then add recipient numbers on the admin Settings page.
+To enable email notifications for new voicemails, follow the Fastmail setup steps
+in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) (create a mail-only app password and set
+`SETTINGS_ENCRYPTION_KEY`), enter your SMTP details on the admin Settings page, then
+add contact emails and mark admins, box owners, and parent/child accounts on the
+Contacts page.
 
 ## Endpoints
 
@@ -242,7 +255,7 @@ US A2P 10DLC), then add recipient numbers on the admin Settings page.
 | `/call/route` | Keypad routing (1–4 → the chosen voicemail box) |
 | `/voicemail` | Voicemail prompt + start recording (per `?box=` slug) |
 | `/voicemail/done` | Thank caller and hang up |
-| `/voicemail/callback` | Save recording (tagged with its box) locally, notify via SMS |
+| `/voicemail/callback` | Save recording (tagged with its box) locally, notify via email |
 | `/voicemail/transcribe` | Store transcript (when transcription enabled) |
 
 ### Public
@@ -276,13 +289,14 @@ app/
     boxes.py             # per-recipient voicemail boxes
     greeting.py          # personalized greeting/voicemail prompt formatting
     call_policy.py       # blocklist + VIP logic
-    contacts.py          # caller ID → display name resolution
+    contacts.py          # caller ID → name resolution + email notification routing
     blocklist_import.py  # CallShield starter import
     twiml.py             # TwiML builders
     twilio_validator.py  # webhook signature decorator
     ssml.py / voices.py  # SSML sanitization and voice selection
     connection_test.py   # Twilio ↔ app diagnostics
-    notify.py            # SMS alerts
+    notify.py            # email alerts (Fastmail SMTP)
+    settings_crypto.py   # Fernet encryption for sensitive settings
     validation.py        # input sanitization
   templates/admin/       # Basecoat-skinned admin pages
   templates/legal/       # public legal pages

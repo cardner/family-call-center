@@ -51,8 +51,9 @@ pytest --cov=app --cov-report=term-missing
 | IVR voice selection | `tests/test_voices.py` |
 | Date/time display helpers | `tests/test_display.py` |
 | Connection diagnostics | `tests/test_connection_diagnostics.py` |
-| SMS notifications (unit) | `tests/test_notify.py` |
-| SMS notifications (admin UI) | `tests/test_admin_notifications.py` |
+| Email notifications (unit) | `tests/test_notify.py` |
+| Email notifications (admin UI) | `tests/test_admin_notifications.py` |
+| SMTP settings encryption | `tests/test_smtp_settings.py` |
 | Legal pages | `tests/test_legal.py` |
 | Static assets | `tests/test_static_basecoat.py` |
 
@@ -96,13 +97,17 @@ Complete each phase's checks before moving on.
 - [ ] Over-limit settings submitted via curl are rejected server-side
 - [ ] Settings survive a container restart
 
-### Phase 4a — SMS notifications
+### Phase 4a — Email notifications
 
-- [ ] Adding recipients on the Settings page saves; an invalid number is rejected
-- [ ] Connection page shows ON with the correct masked recipient count
-- [ ] "Send test SMS" delivers a message to each configured number
-- [ ] Leaving a voicemail texts each recipient a link to `/admin/messages/<id>`
-- [ ] With no recipients configured, voicemail still saves and the callback returns 204
+- [ ] With `SETTINGS_ENCRYPTION_KEY` unset, the Settings page warns and does not save SMTP fields
+- [ ] Saving valid Fastmail SMTP settings persists them; the stored DB value is encrypted (not plaintext)
+- [ ] Reloading Settings never pre-fills the password; leaving it blank keeps the saved password
+- [ ] A private/loopback SMTP host (e.g. `127.0.0.1`) is rejected on save
+- [ ] Contacts marked admin (with an email) receive Family mailbox alerts; a box-linked contact receives that box's alerts
+- [ ] A message in a child account's box emails the child and every parent account (deduped); a non-child box does not email parents
+- [ ] Connection page shows ON with the masked recipient list; "Send test email" delivers to each recipient
+- [ ] Leaving a voicemail emails each recipient a link to `/admin/messages/<id>`
+- [ ] With SMTP or recipients unconfigured, voicemail still saves and the callback returns 204
 
 ### Phase 4b — Voicemail transcription
 
@@ -124,15 +129,17 @@ Complete each phase's checks before moving on.
 
 - [ ] Adding a contact makes its name appear wherever that caller ID is shown
 - [ ] A bare 10-digit number is stored as +1 E.164; junk input is rejected
-- [ ] CSV import adds/updates contacts and reports skipped invalid rows
+- [ ] CSV import adds/updates contacts (including an optional email column) and reports skipped invalid rows
 - [ ] Deleting a contact reverts the caller ID back to the raw number
 - [ ] VIP contact still hears the main menu and can pick a mailbox on a test call
+- [ ] Marking a contact admin or linking a box requires an email; a box can link to only one contact
+- [ ] Marking a contact as a parent requires an email; marking one as a child requires a linked voicemail box; Parent/Child badges show in the contacts list
 
 ### Phase 4d.1 — Voicemail boxes
 
 - [ ] The main menu lists "press N" options for each enabled box (Family/Cody/Ryan/Cory)
 - [ ] Pressing 1–4 starts recording for the matching box; the message shows that box in the inbox
-- [ ] A box's own prompt/thank-you/SMS recipients are used; a blank box inherits the Settings defaults
+- [ ] A box's own prompt/thank-you are used; a blank box inherits the Settings defaults
 - [ ] Disabling a box removes it from the menu and its digit replays the menu
 - [ ] The inbox box filter narrows messages to the selected mailbox
 

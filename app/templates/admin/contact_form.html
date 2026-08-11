@@ -35,6 +35,54 @@
       <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">A VIP is always let through, even if their number is on the blocklist. They still hear the menu and choose which mailbox to leave a message for.</p>
     </div>
 
+    <h3 style="margin:2rem 0 0.5rem;">Email notifications</h3>
+    <p class="muted" style="margin:0 0 1rem; font-size:0.8rem;">Set an email address to make this contact a notification recipient. SMTP delivery is configured on the <a href="{{ url_for('admin.settings') }}">Settings page</a>.</p>
+
+    <div class="field">
+      <label class="label" for="email">Email address</label>
+      <input class="input" id="email" name="email" type="email" maxlength="254"
+             value="{{ form.email.data or '' }}" placeholder="you@example.com" style="max-width:360px;" />
+      {% for error in form.email.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="is_admin" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="is_admin" name="is_admin" type="checkbox" value="y"
+               style="width:auto;" {{ 'checked' if form.is_admin.data }} />
+        Receive Family mailbox notifications
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Admins are emailed whenever a message lands in the shared Family mailbox.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="is_parent" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="is_parent" name="is_parent" type="checkbox" value="y"
+               style="width:auto;" {{ 'checked' if form.is_parent.data }} />
+        Parent account
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Parents are emailed whenever a message lands in <em>any</em> child account's mailbox.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="is_child" style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input id="is_child" name="is_child" type="checkbox" value="y"
+               style="width:auto;" {{ 'checked' if form.is_child.data }} />
+        Child account
+      </label>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">When this contact's mailbox receives a message, every parent account is emailed too. Requires a linked voicemail box below.</p>
+    </div>
+
+    <div class="field">
+      <label class="label" for="box_id">Voicemail box owner</label>
+      <select class="input" id="box_id" name="box_id" style="max-width:360px;">
+        {% for value, label in form.box_id.choices %}
+        <option value="{{ value }}" {{ 'selected' if form.box_id.data == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Link this contact to a personal mailbox to receive email alerts for it. Each box can belong to one contact.</p>
+      {% for error in form.box_id.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
     <button type="submit" class="btn">Save contact</button>
   </form>
 </div>

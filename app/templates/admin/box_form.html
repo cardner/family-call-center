@@ -51,12 +51,7 @@
       {% for error in form.voicemail_thanks.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
-    <div class="field">
-      <label class="label" for="notify_phone_numbers">SMS notification recipients</label>
-      <textarea class="input" id="notify_phone_numbers" name="notify_phone_numbers" rows="3" maxlength="500" placeholder="+15551234567&#10;+15559876543" style="font-family:ui-monospace, monospace;">{{ form.notify_phone_numbers.data or '' }}</textarea>
-      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">One E.164 number per line (or comma-separated). These get a text when a message lands in this box. Leave blank to use the global recipients from Settings.</p>
-      {% for error in form.notify_phone_numbers.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-    </div>
+    <p class="muted" style="font-size:0.8rem;">Email alerts for this box go to the contact linked to it on the <a href="{{ url_for('admin.contacts') }}">Contacts page</a>. The Family box notifies all admins.</p>
 
     <button type="submit" class="btn">Save box</button>
   </form>

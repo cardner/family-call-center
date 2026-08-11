@@ -7,17 +7,18 @@
   <a class="btn btn-sm" href="{{ url_for('admin.contact_new') }}">Add contact</a>
 </div>
 
-<p class="muted" style="margin-top:0;">Map phone numbers to friendly names like "Mom" or "Dr. Smith's office". Names show wherever a caller ID appears.</p>
+<p class="muted" style="margin-top:0;">Map phone numbers to friendly names like "Mom" or "Dr. Smith's office". Names show wherever a caller ID appears. Add an email and mark a contact as an admin or box owner to send them voicemail alerts.</p>
 
 <div class="card">
   {% if contacts %}
   <table>
-    <thead><tr><th>Name</th><th>Phone</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th></th></tr></thead>
     <tbody>
       {% for c in contacts %}
       <tr>
-        <td>{{ c['display_name'] }}{% if c['is_vip'] %} <span class="badge badge-info">VIP</span>{% endif %}</td>
+        <td>{{ c['display_name'] }}{% if c['is_vip'] %} <span class="badge badge-info">VIP</span>{% endif %}{% if c['is_admin'] %} <span class="badge badge-pass">Admin</span>{% endif %}{% if c['is_parent'] %} <span class="badge badge-pass">Parent</span>{% endif %}{% if c['is_child'] %} <span class="badge badge-info">Child</span>{% endif %}{% if c['box_id'] and box_names.get(c['box_id']) %} <span class="badge badge-info">{{ box_names[c['box_id']] }} box</span>{% endif %}</td>
         <td>{{ c['phone'] }}</td>
+        <td class="muted">{{ c['email'] or '—' }}</td>
         <td class="row" style="gap:0.5rem; border:none;">
           <a class="btn btn-outline btn-sm" href="{{ url_for('admin.contact_edit', contact_id=c['id']) }}">Edit</a>
           <form method="post" action="{{ url_for('admin.contact_delete', contact_id=c['id']) }}"
@@ -49,10 +50,10 @@
 
 <div class="card" style="margin-top:1.5rem;">
   <h3>Import from CSV</h3>
-  <p class="muted" style="margin-top:0;">Upload a CSV with two columns: <code>phone,display_name</code>. A header row is optional. Existing numbers are updated. Bare 10-digit numbers are treated as US (+1).</p>
-  <pre class="muted" style="margin:0 0 1rem; white-space:pre-wrap;">phone,display_name
-+15551234567,Mom
-5559876543,Dr. Smith</pre>
+  <p class="muted" style="margin-top:0;">Upload a CSV with columns <code>phone,display_name</code> and an optional <code>email</code>. A header row is optional. Existing numbers are updated (admin and box links are left unchanged). Bare 10-digit numbers are treated as US (+1).</p>
+  <pre class="muted" style="margin:0 0 1rem; white-space:pre-wrap;">phone,display_name,email
++15551234567,Mom,mom@example.com
+5559876543,Dr. Smith,</pre>
   <form method="post" action="{{ url_for('admin.contacts_import') }}" enctype="multipart/form-data" class="row" style="align-items:center;">
     {{ import_form.csrf_token }}
     <input class="input" type="file" name="file" accept=".csv" required style="max-width:320px;" />

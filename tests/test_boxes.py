@@ -2,7 +2,6 @@ from app.utils.boxes import (
     DEFAULT_BOXES,
     get_box_by_digit,
     get_box_by_slug,
-    get_box_notify_phone_numbers,
     get_default_box,
     list_boxes,
     update_box,
@@ -38,13 +37,6 @@ def test_default_box_is_family(app):
     assert get_default_box()["slug"] == "family"
 
 
-def test_box_notify_numbers_filters_invalid(app):
-    cody = get_box_by_slug("cody")
-    update_box(cody["id"], notify_phone_numbers="+15551112222,not-a-number")
-    numbers = get_box_notify_phone_numbers(get_box_by_slug("cody"))
-    assert numbers == ["+15551112222"]
-
-
 def test_box_edit_via_admin(auth_client):
     cody = get_box_by_slug("cody")
     resp = auth_client.post(
@@ -54,7 +46,6 @@ def test_box_edit_via_admin(auth_client):
             "extension_digit": "2",
             "voicemail_prompt": "Leave Cody a message.",
             "voicemail_thanks": "",
-            "notify_phone_numbers": "+15551112222",
             "enabled": "y",
         },
     )
@@ -62,7 +53,6 @@ def test_box_edit_via_admin(auth_client):
     updated = get_box_by_slug("cody")
     assert updated["display_name"] == "Cody M."
     assert updated["voicemail_prompt"] == "Leave Cody a message."
-    assert updated["notify_phone_numbers"] == "+15551112222"
 
 
 def test_box_edit_rejects_duplicate_digit(auth_client):
@@ -75,7 +65,6 @@ def test_box_edit_rejects_duplicate_digit(auth_client):
             "extension_digit": "1",
             "voicemail_prompt": "",
             "voicemail_thanks": "",
-            "notify_phone_numbers": "",
             "enabled": "y",
         },
     )

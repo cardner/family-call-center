@@ -37,6 +37,12 @@ class Config:
 
     SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-me")
 
+    # Fernet key used to encrypt sensitive settings (Fastmail SMTP credentials)
+    # at rest in the SQLite database. Env-only; never stored in the database.
+    # Generate with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    SETTINGS_ENCRYPTION_KEY = os.getenv("SETTINGS_ENCRYPTION_KEY")
+
     # Admin UI credentials. ADMIN_PASSWORD_HASH (werkzeug hash) takes precedence
     # over the plaintext ADMIN_PASSWORD when both are present.
     ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")

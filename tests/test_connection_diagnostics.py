@@ -2,8 +2,16 @@ import time
 
 import app.routes.admin as admin_mod
 from app.utils import connection_test as ct
-from app.utils.settings import set_setting
+from app.utils.db import upsert_contact
+from app.utils.settings import set_smtp_setting
 from config import Config
+
+
+def _configure_smtp():
+    set_smtp_setting("smtp_host", "smtp.fastmail.com")
+    set_smtp_setting("smtp_user", "box@example.com")
+    set_smtp_setting("smtp_password", "app-password")
+    set_smtp_setting("smtp_from", "box@example.com")
 
 
 class _FakeAccount:
@@ -63,7 +71,8 @@ def _statuses(results):
 
 
 def test_all_checks_pass_with_valid_config():
-    set_setting("notify_phone_numbers", "+15551234567")
+    _configure_smtp()
+    upsert_contact("+15551234567", "Ryan", is_admin=True, email="ryan@example.com")
     results = ct.run_all_checks(
         client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
     )
@@ -71,27 +80,28 @@ def test_all_checks_pass_with_valid_config():
     assert all(check["status"] == "pass" for check in results["checks"])
 
 
-def test_sms_check_info_when_unconfigured():
+def test_email_check_info_when_unconfigured():
     results = ct.run_all_checks(
         client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
     )
-    assert _statuses(results)["SMS notifications configured"] == "info"
+    assert _statuses(results)["Email notifications configured"] == "info"
 
 
-def test_sms_check_pass_with_valid_number():
-    set_setting("notify_phone_numbers", "+15551234567")
+def test_email_check_pass_when_configured():
+    _configure_smtp()
+    upsert_contact("+15551234567", "Ryan", is_admin=True, email="ryan@example.com")
     results = ct.run_all_checks(
         client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
     )
-    assert _statuses(results)["SMS notifications configured"] == "pass"
+    assert _statuses(results)["Email notifications configured"] == "pass"
 
 
-def test_sms_check_warns_when_all_invalid():
-    set_setting("notify_phone_numbers", "not-a-number,also-bad")
+def test_email_check_warns_without_recipients():
+    _configure_smtp()
     results = ct.run_all_checks(
         client_factory=lambda: _FakeClient(ok=True), http_get=_FakeHttp(200)
     )
-    assert _statuses(results)["SMS notifications configured"] == "warn"
+    assert _statuses(results)["Email notifications configured"] == "warn"
 
 
 def test_twilio_api_failure_marks_fail():

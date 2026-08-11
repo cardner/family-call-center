@@ -49,6 +49,11 @@ def init_db():
                 phone         TEXT    NOT NULL UNIQUE,
                 display_name  TEXT    NOT NULL,
                 is_vip        INTEGER NOT NULL DEFAULT 0,
+                email         TEXT    NOT NULL DEFAULT '',
+                is_admin      INTEGER NOT NULL DEFAULT 0,
+                is_parent     INTEGER NOT NULL DEFAULT 0,
+                is_child      INTEGER NOT NULL DEFAULT 0,
+                box_id        INTEGER,
                 created_at    TEXT    NOT NULL,
                 updated_at    TEXT    NOT NULL
             )
@@ -123,6 +128,31 @@ def _migrate_db(conn):
             conn.execute(
                 "ALTER TABLE contacts ADD COLUMN is_vip INTEGER NOT NULL DEFAULT 0"
             )
+
+    # Email notification fields (added when SMS alerts were replaced by email).
+    if "email" not in contact_columns:
+        conn.execute("ALTER TABLE contacts ADD COLUMN email TEXT NOT NULL DEFAULT ''")
+    if "is_admin" not in contact_columns:
+        conn.execute(
+            "ALTER TABLE contacts ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"
+        )
+    # Parent/child accounts: a parent is emailed for every child account's box.
+    if "is_parent" not in contact_columns:
+        conn.execute(
+            "ALTER TABLE contacts ADD COLUMN is_parent INTEGER NOT NULL DEFAULT 0"
+        )
+    if "is_child" not in contact_columns:
+        conn.execute(
+            "ALTER TABLE contacts ADD COLUMN is_child INTEGER NOT NULL DEFAULT 0"
+        )
+    if "box_id" not in contact_columns:
+        conn.execute("ALTER TABLE contacts ADD COLUMN box_id INTEGER")
+    # A voicemail box maps to at most one contact. A partial UNIQUE index allows
+    # many contacts with no box (NULL) while still preventing duplicate links.
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_box_id "
+        "ON contacts(box_id) WHERE box_id IS NOT NULL"
+    )
 
 
 def log_recording(
@@ -354,22 +384,89 @@ def get_contact_by_phone(phone):
         ).fetchone()
 
 
-def upsert_contact(phone, display_name, is_vip=False):
+def upsert_contact(
+    phone,
+    display_name,
+    is_vip=False,
+    email="",
+    is_admin=False,
+    box_id=None,
+    is_parent=False,
+    is_child=False,
+):
     """Insert or update a contact keyed on the normalized phone number."""
     now = _utcnow_iso()
     with get_connection() as conn:
         conn.execute(
             """
-            INSERT INTO contacts (phone, display_name, is_vip, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO contacts (
+                phone, display_name, is_vip, email, is_admin, is_parent, is_child,
+                box_id, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(phone) DO UPDATE SET
                 display_name = excluded.display_name,
                 is_vip       = excluded.is_vip,
+                email        = excluded.email,
+                is_admin     = excluded.is_admin,
+                is_parent    = excluded.is_parent,
+                is_child     = excluded.is_child,
+                box_id       = excluded.box_id,
                 updated_at   = excluded.updated_at
             """,
-            (phone, display_name, 1 if is_vip else 0, now, now),
+            (
+                phone,
+                display_name,
+                1 if is_vip else 0,
+                email or "",
+                1 if is_admin else 0,
+                1 if is_parent else 0,
+                1 if is_child else 0,
+                box_id,
+                now,
+                now,
+            ),
         )
         conn.commit()
+
+
+def list_admin_contacts():
+    """Return contacts flagged as admins (they receive Family mailbox alerts)."""
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM contacts WHERE is_admin = 1 "
+            "ORDER BY display_name COLLATE NOCASE ASC, id ASC"
+        ).fetchall()
+
+
+def list_parent_contacts():
+    """Return parent contacts (they receive alerts for every child account box)."""
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM contacts WHERE is_parent = 1 "
+            "ORDER BY display_name COLLATE NOCASE ASC, id ASC"
+        ).fetchall()
+
+
+def get_contact_by_box_id(box_id):
+    """Return the contact linked to a voicemail box, or None."""
+    if box_id is None:
+        return None
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM contacts WHERE box_id = ?", (box_id,)
+        ).fetchone()
+
+
+def list_notification_contacts():
+    """Return contacts that can receive email alerts (admin, parent, or box-linked)."""
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM contacts "
+            "WHERE (is_admin = 1 OR is_parent = 1 OR box_id IS NOT NULL) "
+            "AND email <> '' "
+            "ORDER BY display_name COLLATE NOCASE ASC, id ASC"
+        ).fetchall()
 
 
 def delete_contact(contact_id):
@@ -379,21 +476,26 @@ def delete_contact(contact_id):
         return cursor.rowcount > 0
 
 
-def bulk_upsert_contacts(pairs):
-    """Upsert many (phone, display_name) pairs. Returns the count written."""
+def bulk_upsert_contacts(rows):
+    """Upsert many (phone, display_name, email) rows. Returns the count written.
+
+    The admin and box-link fields are intentionally left untouched here so a CSV
+    re-import never clears notification settings configured in the UI.
+    """
     now = _utcnow_iso()
     written = 0
     with get_connection() as conn:
-        for phone, display_name in pairs:
+        for phone, display_name, email in rows:
             conn.execute(
                 """
-                INSERT INTO contacts (phone, display_name, created_at, updated_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO contacts (phone, display_name, email, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(phone) DO UPDATE SET
                     display_name = excluded.display_name,
+                    email        = excluded.email,
                     updated_at   = excluded.updated_at
                 """,
-                (phone, display_name, now, now),
+                (phone, display_name, email or "", now, now),
             )
             written += 1
         conn.commit()

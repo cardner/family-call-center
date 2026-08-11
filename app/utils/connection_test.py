@@ -187,35 +187,38 @@ def _check_public_health(http_get):
         )
 
 
-def _check_sms_notifications():
-    from app.utils.settings import (
-        get_notify_phone_numbers,
-        get_setting,
-        parse_phone_numbers,
-    )
+def _check_email_notifications():
+    from app.utils.contacts import count_notification_recipients
+    from app.utils.settings import smtp_configured
 
-    raw = get_setting("notify_phone_numbers", "")
-    configured = parse_phone_numbers(raw)
-    valid = get_notify_phone_numbers()
+    configured = smtp_configured()
+    recipients = count_notification_recipients()
 
-    if valid:
+    if configured and recipients:
         return _result(
-            "SMS notifications configured",
+            "Email notifications configured",
             PASS,
-            f"New-voicemail alerts will be sent to {len(valid)} recipient(s).",
+            f"New-voicemail alerts will be emailed to {recipients} recipient(s).",
         )
-    if configured:
+    if configured and not recipients:
         return _result(
-            "SMS notifications configured",
+            "Email notifications configured",
             WARN,
-            "Recipients are set but none are valid E.164 numbers.",
-            detail="Fix them on the Settings page (e.g. +15551234567).",
+            "SMTP is set up but no contacts have an email address.",
+            detail="Add an email to a contact (Admin or box owner) on the Contacts page.",
+        )
+    if recipients and not configured:
+        return _result(
+            "Email notifications configured",
+            WARN,
+            "Recipients are set but Fastmail SMTP is not configured.",
+            detail="Enter your SMTP settings on the Settings page.",
         )
     return _result(
-        "SMS notifications configured",
+        "Email notifications configured",
         INFO,
-        "No SMS recipients configured (optional).",
-        detail="Add numbers on the Settings page to enable alerts.",
+        "Email notifications are not configured (optional).",
+        detail="Set up SMTP on the Settings page and add contact emails.",
     )
 
 
@@ -270,7 +273,7 @@ def run_all_checks(client_factory=None, http_get=None):
     checks.append(_check_phone_number(client))
     checks.append(_check_public_health(http_get))
     checks.append(_check_webhook_signature())
-    checks.append(_check_sms_notifications())
+    checks.append(_check_email_notifications())
 
     return {
         "checks": checks,

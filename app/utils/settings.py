@@ -5,9 +5,16 @@ the admin UI. Infrastructure secrets (Twilio creds, BASE_URL, DATA_DIR) are NOT
 stored here — they remain environment-only.
 """
 
+import ipaddress
 import re
 
 from app.utils.db import get_connection
+from app.utils.settings_crypto import (
+    decrypt_setting_value,
+    encrypt_setting_value,
+    encryption_available,
+    is_encrypted_value,
+)
 
 # Speech/prompt fields are capped to this many characters.
 IVR_TEXT_MAX_LENGTH = 500
@@ -16,9 +23,13 @@ IVR_TEXT_MAX_LENGTH = 500
 MAX_RECORDING_SECONDS_MIN = 10
 MAX_RECORDING_SECONDS_MAX = 600
 
-# The SMS notification recipient field accepts a handful of numbers; cap the raw
-# text to keep the settings row bounded.
-NOTIFY_PHONE_NUMBERS_MAX_LENGTH = 500
+# SMTP text fields (host, username, from address) are capped to keep the
+# settings row bounded.
+SMTP_TEXT_MAX_LENGTH = 255
+
+# Ports we allow for Fastmail SMTP submission: 465 (implicit SSL) or 587
+# (STARTTLS). Anything else is rejected on save.
+SMTP_ALLOWED_PORTS = (465, 587)
 
 # Twilio only transcribes recordings shorter than this many seconds; when
 # transcription is on we clamp the Record verb's max length to it.
@@ -45,7 +56,6 @@ DEFAULT_SETTINGS = {
     ),
     "max_recording_seconds": "300",
     "ivr_voice": "Google.en-US-Neural2-D",
-    "notify_phone_numbers": "",
     "transcription_enabled": "false",
     "personalized_greeting_enabled": "false",
     "block_action": "reject",
@@ -53,6 +63,19 @@ DEFAULT_SETTINGS = {
         "This number is not accepting calls. <break time=\"200ms\"/> Goodbye."
     ),
 }
+
+# Fastmail SMTP settings. Stored in the same ``settings`` table but always
+# encrypted at rest and accessed only through the ``*_smtp_*`` helpers below, so
+# they are deliberately kept out of DEFAULT_SETTINGS (which seeds plaintext rows
+# and is exposed by get_all_settings).
+SMTP_DEFAULTS = {
+    "smtp_host": "smtp.fastmail.com",
+    "smtp_port": "465",
+    "smtp_user": "",
+    "smtp_password": "",
+    "smtp_from": "",
+}
+SMTP_SETTING_KEYS = tuple(SMTP_DEFAULTS)
 
 
 def seed_default_settings():
@@ -91,10 +114,18 @@ def set_setting(key, value):
 
 
 def get_all_settings():
+    """Return all non-secret settings.
+
+    SMTP credentials are deliberately excluded: they are encrypted at rest and
+    must be read individually through ``get_smtp_setting`` so decrypted secrets
+    never flow into general-purpose settings consumers or rendered pages.
+    """
     with get_connection() as conn:
         rows = conn.execute("SELECT key, value FROM settings").fetchall()
     values = dict(DEFAULT_SETTINGS)
     for row in rows:
+        if row["key"] in SMTP_SETTING_KEYS:
+            continue
         values[row["key"]] = row["value"]
     return values
 
@@ -147,11 +178,100 @@ def parse_phone_numbers(raw):
     return numbers
 
 
-def get_notify_phone_numbers():
-    """Return the stored SMS recipients, keeping only valid E.164 numbers.
+# --- Fastmail SMTP settings (encrypted at rest) ----------------------------
 
-    Invalid entries are skipped defensively so a bad value can never break the
-    voicemail callback; the settings form rejects invalid input on save.
+
+def is_valid_smtp_host(host):
+    """Return True if ``host`` is a safe, routable SMTP hostname.
+
+    Rejects URLs, embedded ports, and literal private/reserved IP addresses so
+    the admin-configurable host cannot be used to reach internal services
+    (SSRF). A bare hostname must have at least two DNS labels.
     """
-    raw = get_setting("notify_phone_numbers", DEFAULT_SETTINGS["notify_phone_numbers"])
-    return [number for number in parse_phone_numbers(raw) if is_valid_e164(number)]
+    host = (host or "").strip()
+    if not host or len(host) > SMTP_TEXT_MAX_LENGTH:
+        return False
+    if any(ch in host for ch in " /\\:@\t\r\n"):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        return not (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_reserved
+            or ip.is_link_local
+            or ip.is_multicast
+            or ip.is_unspecified
+        )
+    labels = host.split(".")
+    if len(labels) < 2:
+        return False
+    label_re = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+    return all(label_re.match(label) for label in labels)
+
+
+def normalize_smtp_port(value):
+    """Return a valid SMTP port (465 or 587), defaulting to 465."""
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return int(SMTP_DEFAULTS["smtp_port"])
+    return port if port in SMTP_ALLOWED_PORTS else int(SMTP_DEFAULTS["smtp_port"])
+
+
+def get_smtp_setting(key):
+    """Return one decrypted SMTP setting, falling back to its default.
+
+    Legacy plaintext values (written before encryption existed) are returned
+    as-is and get re-encrypted the next time the field is saved.
+    """
+    if key not in SMTP_SETTING_KEYS:
+        raise KeyError(key)
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = ?", (key,)
+        ).fetchone()
+    if row is None:
+        return SMTP_DEFAULTS[key]
+    raw = row["value"]
+    if is_encrypted_value(raw):
+        plain = decrypt_setting_value(raw)
+        return plain if plain is not None else ""
+    return raw
+
+
+def set_smtp_setting(key, plaintext):
+    """Encrypt and persist one SMTP setting. Raises if no key is configured."""
+    if key not in SMTP_SETTING_KEYS:
+        raise KeyError(key)
+    set_setting(key, encrypt_setting_value("" if plaintext is None else str(plaintext)))
+
+
+def get_smtp_config():
+    """Return the decrypted SMTP configuration used to send email."""
+    host = get_smtp_setting("smtp_host") or SMTP_DEFAULTS["smtp_host"]
+    user = get_smtp_setting("smtp_user")
+    from_email = get_smtp_setting("smtp_from") or user
+    return {
+        "host": host,
+        "port": normalize_smtp_port(get_smtp_setting("smtp_port")),
+        "user": user,
+        "password": get_smtp_setting("smtp_password"),
+        "from_email": from_email,
+    }
+
+
+def smtp_configured():
+    """Return True if email can actually be sent right now."""
+    if not encryption_available():
+        return False
+    config = get_smtp_config()
+    return bool(
+        config["host"]
+        and config["user"]
+        and config["password"]
+        and config["from_email"]
+    )

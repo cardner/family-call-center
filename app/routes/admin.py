@@ -34,7 +34,13 @@ from app.forms.admin_forms import (
     SettingsForm,
 )
 from app.utils.auth import login_required, login_user, logout_user, verify_credentials
-from app.utils.boxes import get_box, get_box_by_slug, list_boxes, update_box
+from app.utils.boxes import (
+    DEFAULT_BOX_SLUG,
+    get_box,
+    get_box_by_slug,
+    list_boxes,
+    update_box,
+)
 from app.utils.blocklist_import import (
     SEED_SOURCE,
     BlocklistImportError,
@@ -42,7 +48,7 @@ from app.utils.blocklist_import import (
 )
 from app.utils.call_policy import is_blocked, normalize_caller_id
 from app.utils.connection_test import run_all_checks, webhook_urls
-from app.utils.contacts import parse_contacts_csv
+from app.utils.contacts import normalize_email, parse_contacts_csv
 from app.utils.db import (
     bulk_upsert_contacts,
     count_blocked,
@@ -56,6 +62,7 @@ from app.utils.db import (
     delete_recording,
     get_blocked,
     get_contact,
+    get_contact_by_box_id,
     get_recording,
     list_blocked,
     list_contacts,
@@ -66,7 +73,13 @@ from app.utils.db import (
     upsert_contact,
 )
 from app.utils.notify import notification_summary, send_test_notification
-from app.utils.settings import get_all_settings, parse_phone_numbers, set_setting
+from app.utils.settings import (
+    get_all_settings,
+    get_smtp_setting,
+    set_setting,
+    set_smtp_setting,
+)
+from app.utils.settings_crypto import encryption_available
 from app.utils.validation import clamp_int, sanitize_ivr_text, sanitize_text, safe_next_url
 from app.utils.voices import ivr_voice_meta, normalize_ivr_voice
 from config import Config
@@ -254,10 +267,6 @@ def settings():
         set_setting("ivr_voice", normalize_ivr_voice(form.ivr_voice.data))
         set_setting("max_recording_seconds", str(form.max_recording_seconds.data))
         set_setting(
-            "notify_phone_numbers",
-            ",".join(parse_phone_numbers(form.notify_phone_numbers.data)),
-        )
-        set_setting(
             "transcription_enabled",
             "true" if form.transcription_enabled.data else "false",
         )
@@ -270,6 +279,7 @@ def settings():
             "blocked_caller_message",
             sanitize_ivr_text(form.blocked_caller_message.data or ""),
         )
+        _save_smtp_settings(form)
         flash("Settings saved.", "success")
         return redirect(url_for("admin.settings"))
 
@@ -284,22 +294,54 @@ def settings():
             form.max_recording_seconds.data = int(current.get("max_recording_seconds"))
         except (TypeError, ValueError):
             form.max_recording_seconds.data = 300
-        form.notify_phone_numbers.data = "\n".join(
-            parse_phone_numbers(current.get("notify_phone_numbers"))
-        )
         form.transcription_enabled.data = current.get("transcription_enabled") == "true"
         form.personalized_greeting_enabled.data = (
             current.get("personalized_greeting_enabled") == "true"
         )
         form.block_action.data = current.get("block_action")
         form.blocked_caller_message.data = current.get("blocked_caller_message")
+        # SMTP fields are loaded decrypted. The password is intentionally never
+        # pre-filled; a blank submission leaves the stored password unchanged.
+        form.smtp_host.data = get_smtp_setting("smtp_host")
+        form.smtp_port.data = get_smtp_setting("smtp_port")
+        form.smtp_user.data = get_smtp_setting("smtp_user")
+        form.smtp_from.data = get_smtp_setting("smtp_from")
 
     return render_template(
         "admin/settings.html",
         form=form,
         logout_form=LogoutForm(),
         ivr_voice_meta=ivr_voice_meta(),
+        smtp_password_set=bool(get_smtp_setting("smtp_password")),
+        encryption_available=encryption_available(),
     )
+
+
+def _save_smtp_settings(form):
+    """Persist encrypted SMTP settings from a validated SettingsForm.
+
+    The password is only updated when a new value is supplied, so leaving the
+    field blank rotates nothing. If no encryption key is configured, the SMTP
+    fields are skipped and the admin is warned (other settings still save).
+    """
+    wants_smtp = any(
+        [form.smtp_user.data, form.smtp_password.data, form.smtp_from.data]
+    )
+    if not encryption_available():
+        if wants_smtp:
+            flash(
+                "Email settings were not saved: SETTINGS_ENCRYPTION_KEY is not "
+                "configured on the server.",
+                "error",
+            )
+        return
+
+    set_smtp_setting("smtp_host", sanitize_text(form.smtp_host.data or "", 255))
+    set_smtp_setting("smtp_port", form.smtp_port.data or "465")
+    set_smtp_setting("smtp_user", sanitize_text(form.smtp_user.data or "", 255))
+    set_smtp_setting("smtp_from", sanitize_text(form.smtp_from.data or "", 255))
+    if form.smtp_password.data:
+        set_smtp_setting("smtp_password", form.smtp_password.data)
 
 
 @admin_bp.get("/boxes")
@@ -342,9 +384,6 @@ def box_edit(box_id):
                 extension_digit=digit,
                 voicemail_prompt=sanitize_ivr_text(form.voicemail_prompt.data or ""),
                 voicemail_thanks=sanitize_ivr_text(form.voicemail_thanks.data or ""),
-                notify_phone_numbers=",".join(
-                    parse_phone_numbers(form.notify_phone_numbers.data)
-                ),
                 enabled=1 if form.enabled.data else 0,
             )
             flash("Voicemail box saved.", "success")
@@ -355,9 +394,6 @@ def box_edit(box_id):
         form.extension_digit.data = row["extension_digit"]
         form.voicemail_prompt.data = row["voicemail_prompt"]
         form.voicemail_thanks.data = row["voicemail_thanks"]
-        form.notify_phone_numbers.data = "\n".join(
-            parse_phone_numbers(row["notify_phone_numbers"])
-        )
         form.enabled.data = bool(row["enabled"])
 
     return render_template(
@@ -419,15 +455,19 @@ def notification_test():
 
     results = send_test_notification()
     if not results:
-        flash("No SMS recipients configured. Add numbers on the Settings page.", "error")
+        flash(
+            "No email recipients configured. Set up SMTP on the Settings page and "
+            "add contacts with an email address.",
+            "error",
+        )
     else:
         sent = sum(1 for r in results if r["status"] == "sent")
         failed = len(results) - sent
         if failed == 0:
-            flash(f"Test SMS sent to {sent} recipient(s).", "success")
+            flash(f"Test email sent to {sent} recipient(s).", "success")
         else:
             flash(
-                f"Test SMS sent to {sent} recipient(s); {failed} failed. "
+                f"Test email sent to {sent} recipient(s); {failed} failed. "
                 "Check the logs for details.",
                 "error",
             )
@@ -449,10 +489,12 @@ def contacts():
     offset = (page - 1) * per_page
 
     rows = list_contacts(limit=per_page, offset=offset)
+    box_names = {box["id"]: box["display_name"] for box in list_boxes()}
 
     return render_template(
         "admin/contacts.html",
         contacts=rows,
+        box_names=box_names,
         page=page,
         per_page=per_page,
         total=total,
@@ -463,18 +505,48 @@ def contacts():
     )
 
 
+def _contact_box_choices():
+    """Selectable voicemail boxes for a contact (enabled, excluding Family)."""
+    choices = [("", "— None —")]
+    for box in list_boxes(enabled_only=True):
+        if box["slug"] == DEFAULT_BOX_SLUG:
+            continue
+        choices.append((str(box["id"]), box["display_name"]))
+    return choices
+
+
+def _save_contact_from_form(form, current_contact_id=None):
+    """Validate the box link and persist a contact. Returns True on success."""
+    box_id = int(form.box_id.data) if form.box_id.data else None
+    if box_id is not None:
+        owner = get_contact_by_box_id(box_id)
+        if owner is not None and owner["id"] != current_contact_id:
+            flash(
+                f"That voicemail box is already linked to {owner['display_name']}.",
+                "error",
+            )
+            return False
+    # validate_phone stored the normalized number back on the field.
+    upsert_contact(
+        form.phone.data,
+        sanitize_text(form.display_name.data, 120),
+        is_vip=form.is_vip.data,
+        email=normalize_email(form.email.data),
+        is_admin=form.is_admin.data,
+        box_id=box_id,
+        is_parent=form.is_parent.data,
+        is_child=form.is_child.data,
+    )
+    flash("Contact saved.", "success")
+    return True
+
+
 @admin_bp.route("/contacts/new", methods=["GET", "POST"])
 @login_required
 def contact_new():
     form = ContactForm()
-    if form.validate_on_submit():
-        # validate_phone stored the normalized number back on the field.
-        upsert_contact(
-            form.phone.data,
-            sanitize_text(form.display_name.data, 120),
-            is_vip=form.is_vip.data,
-        )
-        flash("Contact saved.", "success")
+    form.box_id.choices = _contact_box_choices()
+    if form.validate_on_submit() and _save_contact_from_form(form):
         return redirect(url_for("admin.contacts"))
 
     return render_template(
@@ -493,19 +565,21 @@ def contact_edit(contact_id):
         abort(404)
 
     form = ContactForm()
-    if form.validate_on_submit():
-        upsert_contact(
-            form.phone.data,
-            sanitize_text(form.display_name.data, 120),
-            is_vip=form.is_vip.data,
-        )
-        flash("Contact saved.", "success")
+    form.box_id.choices = _contact_box_choices()
+    if form.validate_on_submit() and _save_contact_from_form(
+        form, current_contact_id=contact_id
+    ):
         return redirect(url_for("admin.contacts"))
 
     if request.method == "GET":
         form.phone.data = row["phone"]
         form.display_name.data = row["display_name"]
         form.is_vip.data = bool(row["is_vip"])
+        form.email.data = row["email"]
+        form.is_admin.data = bool(row["is_admin"])
+        form.is_parent.data = bool(row["is_parent"])
+        form.is_child.data = bool(row["is_child"])
+        form.box_id.data = str(row["box_id"]) if row["box_id"] else ""
 
     return render_template(
         "admin/contact_form.html",

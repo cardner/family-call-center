@@ -35,14 +35,14 @@ python -c "from werkzeug.security import generate_password_hash; print(generate_
 
 | Page | Path | What it does |
 |------|------|--------------|
-| Dashboard | `/admin/` | Message count, unread count, SMS status, and last connection-test result |
+| Dashboard | `/admin/` | Message count, unread count, email notification status, and last connection-test result |
 | Messages | `/admin/messages` | Paginated inbox with search, box filter, transcript previews, and read/unread |
 | Message detail | `/admin/messages/<id>` | Metadata, mailbox, transcript, audio player, delete, block caller |
 | Voicemail boxes | `/admin/boxes` | Manage the per-recipient mailboxes (Family, Cody, Ryan, Cory) |
-| Contacts | `/admin/contacts` | Manage the phone → name address book; CSV import |
+| Contacts | `/admin/contacts` | Manage the phone → name address book plus email notification routing; CSV import |
 | Blocklist | `/admin/blocked` | Manage blocked numbers; optional CallShield starter import |
-| Settings | `/admin/settings` | Edit IVR/voicemail prompts, voice, toggles, and default SMS recipients |
-| Connection | `/admin/connection` | Run Twilio ↔ app diagnostics; copy webhook URLs; test SMS |
+| Settings | `/admin/settings` | Edit IVR/voicemail prompts, voice, toggles, and Fastmail SMTP credentials |
+| Connection | `/admin/connection` | Run Twilio ↔ app diagnostics; copy webhook URLs; test email |
 
 ## Messages inbox
 
@@ -75,9 +75,9 @@ leave a message in. Four boxes are set up out of the box:
 - The main menu greeting is the intro from Settings followed by an automatically
   generated "For {name}, press {digit}." line for each enabled box, so adding or
   renaming a box updates the menu without editing the greeting text.
-- Each box can override the **voicemail prompt**, **thank-you message**, and **SMS
-  notification recipients**. Leave any of these blank to inherit the global
-  default from Settings.
+- Each box can override the **voicemail prompt** and **thank-you message**. Leave
+  either blank to inherit the global default from Settings. Email alerts for a box
+  are routed through Contacts, not configured on the box itself.
 - A box can be **disabled**, which removes it from the menu and stops its digit
   from doing anything.
 - Every saved message is tagged with its box, shown in the inbox and on the
@@ -90,13 +90,25 @@ appear everywhere a caller ID is shown (inbox, dashboard, message detail).
 
 - Add or edit contacts individually. Phone numbers are normalized to E.164 on
   save; a bare 10-digit number is treated as US (+1).
-- **CSV import**: upload a file with `phone,display_name` columns (an optional
-  header row is allowed). Existing numbers are updated; invalid rows are skipped
-  and reported.
+- **CSV import**: upload a file with `phone,display_name` columns and an optional
+  `email` column (a header row is allowed). Existing numbers are updated; invalid
+  rows are skipped and reported. Admin and box-link fields are UI-only and are not
+  changed by an import.
 - **VIP**: enable "VIP contact (bypasses blocklist)" to always let a contact
   through, even if their number is on the blocklist — a number that is both VIP
   and blocked is allowed through. VIPs still hear the main menu and choose a
   mailbox like everyone else; the flag only affects blocklist handling.
+- **Email notifications**: give a contact an **email address** to make them a
+  notification recipient. Mark them as an **admin** to receive alerts for the
+  shared **Family** mailbox, and/or link them to a personal **voicemail box**
+  (Cody, Ryan, Cory) to receive that box's alerts. An email is required whenever a
+  contact is an admin, a parent, or a box owner. Each personal box can belong to
+  only one contact. SMTP delivery is configured on the Settings page.
+- **Parent / child accounts**: mark a contact as a **parent account** to have
+  them emailed whenever a message lands in *any* child account's mailbox. Mark a
+  box-linked contact as a **child account** so that, in addition to the child
+  themselves, every parent account is notified about that box's messages. A child
+  account must be linked to a voicemail box.
 
 ## Blocklist
 
@@ -129,7 +141,7 @@ selection, toggles, and the recording length limit:
 | Thank-you message | ≤ 500 chars; default for boxes that don't set their own; SSML tags supported |
 | Max recording length | 10–600 seconds |
 | Enable voicemail transcription | Off by default; see [Voicemail transcription](#voicemail-transcription) |
-| SMS notification recipients | Optional default list. E.164 numbers (one per line or comma-separated) that receive a text when a voicemail is saved in a box with no recipients of its own. Leave blank to disable. Invalid numbers are rejected on save. |
+| Email notifications (Fastmail SMTP) | SMTP host, security (port 465/587), username, app password, and optional From address. Credentials are encrypted at rest; the password is never re-displayed and is left unchanged when the field is blank. See [Email notifications](#email-notifications). |
 | Blocked caller handling | Reject (busy) or play a message, then hang up |
 | Blocked caller message | Spoken when "play a message" is selected; SSML supported |
 
@@ -192,21 +204,28 @@ a call. Each check reports pass / warn / fail:
 - Public health URL reachable (a warn is expected when testing from your own LAN
   because of hairpin NAT — verify from cellular/off-network)
 - Webhook signature validation round-trips for `BASE_URL/call`
-- SMS notification configuration (on/off, recipient count)
+- Email notification configuration (SMTP configured in Settings + at least one
+  contact with a routable email)
 
 It also shows copy-ready webhook URLs and a reminder to place a live test call.
 The test endpoint is rate-limited and never displays secrets (the account SID is
 masked).
 
-## SMS notifications
+## Email notifications
 
-When a voicemail is saved, the app can text an alert with a link to the message to
-one or more recipients. Recipient numbers are managed as a setting on the Settings
-page (see above), so they can be changed without a redeploy. The Connection page
-shows whether notifications are on or off, the number of recipients (masked to the
-last four digits), and a rate-limited **Send test SMS** button to confirm delivery.
-The dashboard shows an on/off badge with a shortcut to configure or test. Twilio
-account setup for SMS is covered in [DEPLOYMENT.md](DEPLOYMENT.md).
+When a voicemail is saved, the app emails an alert with a link to the message to
+the recipients derived from Contacts: **admins** receive Family mailbox messages,
+and each personal box notifies the single contact linked to it. Recipients are one
+person per email address, deduplicated so someone who is both an admin and a box
+owner receives a single message.
+
+SMTP delivery uses Fastmail and is configured on the Settings page (host, port,
+username, app password, optional From address). Credentials are **encrypted at
+rest** with `SETTINGS_ENCRYPTION_KEY`; the password is never redisplayed and stays
+unchanged when the Settings field is left blank. The Connection page shows whether
+notifications are on or off, the masked recipient list, and a rate-limited **Send
+test email** button. The dashboard shows an on/off badge with a shortcut to
+configure or test. Fastmail account setup is covered in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Security model
 

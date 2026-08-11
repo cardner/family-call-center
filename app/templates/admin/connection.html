@@ -47,20 +47,24 @@
 </div>
 
 <div class="card" style="margin-top:1.5rem;">
-  <h3>SMS notifications
+  <h3>Email notifications
     <span class="badge badge-{{ 'pass' if notifications.enabled else 'info' }}" style="margin-left:0.5rem;">{{ 'ON' if notifications.enabled else 'OFF' }}</span>
   </h3>
   {% if notifications.enabled %}
-  <p style="margin:0 0 0.75rem;">A new-voicemail alert is sent to {{ notifications.recipient_count }} recipient(s):
+  <p style="margin:0 0 0.75rem;">A new-voicemail alert is emailed to {{ notifications.recipient_count }} recipient(s):
     <span class="muted">{{ notifications.masked_recipients | join(', ') }}</span>
   </p>
   <form method="post" action="{{ url_for('admin.notification_test') }}">
     {{ notification_form.csrf_token }}
-    <button type="submit" class="btn btn-outline">Send test SMS</button>
+    <button type="submit" class="btn btn-outline">Send test email</button>
   </form>
+  {% elif not notifications.smtp_configured %}
+  <p class="muted" style="margin:0;">Fastmail SMTP is not configured. Set it up on the
+    <a href="{{ url_for('admin.settings') }}">Settings page</a> to enable email alerts.</p>
   {% else %}
-  <p class="muted" style="margin:0;">No recipients configured. Add phone numbers on the
-    <a href="{{ url_for('admin.settings') }}">Settings page</a> to enable SMS alerts.</p>
+  <p class="muted" style="margin:0;">SMTP is configured, but no contacts have an email address.
+    Add an email to an admin or box-owner contact on the
+    <a href="{{ url_for('admin.contacts') }}">Contacts page</a>.</p>
   {% endif %}
 </div>
 

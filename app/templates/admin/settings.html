@@ -73,7 +73,7 @@
         <button type="button" class="btn btn-outline btn-sm prompt-preview-btn" data-field="voicemail_prompt">Preview</button>
       </div>
       <textarea class="input" id="voicemail_prompt" name="voicemail_prompt" rows="4" maxlength="500" required style="font-family:ui-monospace, monospace;">{{ form.voicemail_prompt.data or '' }}</textarea>
-      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Default prompt, thank-you, and SMS recipients below apply to any <a href="{{ url_for('admin.boxes') }}">voicemail box</a> that leaves them blank.</p>
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Default prompt and thank-you message apply to any <a href="{{ url_for('admin.boxes') }}">voicemail box</a> that leaves them blank.</p>
       {% for error in form.voicemail_prompt.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
@@ -103,13 +103,6 @@
     </div>
 
     <div class="field">
-      <label class="label" for="notify_phone_numbers">SMS notification recipients</label>
-      <textarea class="input" id="notify_phone_numbers" name="notify_phone_numbers" rows="3" maxlength="500" placeholder="+15551234567&#10;+15559876543" style="font-family:ui-monospace, monospace;">{{ form.notify_phone_numbers.data or '' }}</textarea>
-      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">One number per line (or comma-separated) in E.164 format, e.g. <code>+15551234567</code>. Each gets an SMS when a voicemail is saved. Leave blank to disable. On a Twilio trial account, every number must be verified first.</p>
-      {% for error in form.notify_phone_numbers.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-    </div>
-
-    <div class="field">
       <label class="label" for="block_action">Blocked caller handling</label>
       <select class="input" id="block_action" name="block_action" required style="max-width:28rem;">
         {% for value, label in form.block_action.choices %}
@@ -128,6 +121,55 @@
       <textarea class="input" id="blocked_caller_message" name="blocked_caller_message" rows="2" maxlength="500" style="font-family:ui-monospace, monospace;">{{ form.blocked_caller_message.data or '' }}</textarea>
       <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Only used when "Play a message" is selected above. SSML tags are supported.</p>
       {% for error in form.blocked_caller_message.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <h3 style="margin:2rem 0 0.5rem;">Email notifications (Fastmail SMTP)</h3>
+    <p class="muted" style="margin:0 0 1rem; font-size:0.8rem;">When a voicemail is saved, an email alert is sent to the recipients you set on the <a href="{{ url_for('admin.contacts') }}">Contacts page</a> (admins get Family messages; each personal box notifies its linked contact). Create a mail-only <a href="https://www.fastmail.help/hc/en-us/articles/360058752854-App-passwords" target="_blank" rel="noopener">Fastmail app password</a> and enter it below. Credentials are encrypted before they are stored.</p>
+
+    {% if not encryption_available %}
+    <div class="field-error" style="margin-bottom:1rem;">Email settings cannot be saved until <code>SETTINGS_ENCRYPTION_KEY</code> is configured on the server.</div>
+    {% endif %}
+
+    <div class="field">
+      <label class="label" for="smtp_host">SMTP host</label>
+      <input class="input" id="smtp_host" name="smtp_host" type="text" maxlength="255"
+             value="{{ form.smtp_host.data or '' }}" placeholder="smtp.fastmail.com" style="max-width:360px;" />
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Fastmail uses <code>smtp.fastmail.com</code>.</p>
+      {% for error in form.smtp_host.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="smtp_port">Security</label>
+      <select class="input" id="smtp_port" name="smtp_port" style="max-width:220px;">
+        {% for value, label in form.smtp_port.choices %}
+        <option value="{{ value }}" {{ 'selected' if form.smtp_port.data == value }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% for error in form.smtp_port.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="smtp_user">SMTP username</label>
+      <input class="input" id="smtp_user" name="smtp_user" type="email" maxlength="255"
+             autocomplete="off" value="{{ form.smtp_user.data or '' }}" placeholder="you@yourdomain.com" style="max-width:360px;" />
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Your full Fastmail email address.</p>
+      {% for error in form.smtp_user.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="smtp_password">SMTP password (Fastmail app password)</label>
+      <input class="input" id="smtp_password" name="smtp_password" type="password" maxlength="255"
+             autocomplete="new-password" placeholder="{{ 'Leave blank to keep the saved password' if smtp_password_set else '' }}" style="max-width:360px;" />
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">{% if smtp_password_set %}A password is saved. Leave this blank to keep it, or enter a new one to replace it.{% else %}Paste the app password generated in Fastmail.{% endif %}</p>
+      {% for error in form.smtp_password.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="smtp_from">From address</label>
+      <input class="input" id="smtp_from" name="smtp_from" type="email" maxlength="255"
+             value="{{ form.smtp_from.data or '' }}" placeholder="voicemail@yourdomain.com" style="max-width:360px;" />
+      <p class="muted" style="margin:0.25rem 0 0; font-size:0.8rem;">Optional. Leave blank to send from the SMTP username.</p>
+      {% for error in form.smtp_from.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
     </div>
 
     <button type="submit" class="btn">Save settings</button>

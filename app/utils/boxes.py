@@ -1,18 +1,18 @@
 """Per-recipient voicemail boxes.
 
-Each box maps a single menu digit to a mailbox with its own optional prompt,
-thank-you message, and SMS notification recipients. The four family boxes
-(Family, Cody, Ryan, Cory) are seeded on first run and edited from the admin UI.
+Each box maps a single menu digit to a mailbox with its own optional prompt and
+thank-you message. The four family boxes (Family, Cody, Ryan, Cory) are seeded
+on first run and edited from the admin UI. Email alerts for each box are routed
+through the Contacts address book (see ``app/utils/contacts.py``).
 
-Prompt, thank-you, and notification fields are treated as *overrides*: when a
-box leaves one blank it falls back to the global Setting of the same name, so a
-fresh install behaves exactly like the previous single-mailbox setup.
+Prompt and thank-you fields are treated as *overrides*: when a box leaves one
+blank it falls back to the global Setting of the same name, so a fresh install
+behaves exactly like the previous single-mailbox setup.
 """
 
 import re
 
 from app.utils.db import get_connection
-from app.utils.settings import is_valid_e164, parse_phone_numbers
 
 # Slug: lowercase letters, digits, and hyphens. Used in the /voicemail?box=slug
 # query parameter and as the stable key for lookups.
@@ -37,7 +37,6 @@ _EDITABLE_COLUMNS = (
     "extension_digit",
     "voicemail_prompt",
     "voicemail_thanks",
-    "notify_phone_numbers",
     "enabled",
 )
 
@@ -121,14 +120,6 @@ def get_default_box():
 def _first_box():
     boxes = list_boxes(enabled_only=True)
     return boxes[0] if boxes else None
-
-
-def get_box_notify_phone_numbers(box):
-    """Return a box's own valid SMS recipients (empty list if it inherits)."""
-    if box is None:
-        return []
-    raw = box["notify_phone_numbers"]
-    return [number for number in parse_phone_numbers(raw) if is_valid_e164(number)]
 
 
 def update_box(box_id, **fields):

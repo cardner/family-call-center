@@ -29,10 +29,8 @@ def test_settings_post_updates_twiml(auth_client):
     assert "Fresh custom greeting here" in twiml
 
 
-def test_notify_phone_numbers_default_empty(app):
-    assert get_setting("notify_phone_numbers") == ""
+def test_get_all_settings_omits_smtp_keys(app):
+    from app.utils.settings import set_smtp_setting
 
-
-def test_notify_phone_numbers_persists(app):
-    set_setting("notify_phone_numbers", "+15551234567,+15559876543")
-    assert get_setting("notify_phone_numbers") == "+15551234567,+15559876543"
+    set_smtp_setting("smtp_user", "box@example.com")
+    assert "smtp_user" not in get_all_settings()

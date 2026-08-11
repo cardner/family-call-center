@@ -1,28 +1,57 @@
 import app.routes.admin as admin_mod
-from app.utils.settings import get_setting
+from app.utils.db import upsert_contact
+from app.utils.settings import get_smtp_setting, set_smtp_setting
+from config import Config
 from tests.helpers import valid_settings
 
 
-def test_settings_saves_recipients(auth_client):
-    data = valid_settings(notify_phone_numbers="+15551234567\n+15559876543")
-    resp = auth_client.post("/admin/settings", data=data, follow_redirects=True)
+def _smtp_payload(**overrides):
+    data = valid_settings(
+        smtp_host="smtp.fastmail.com",
+        smtp_port="465",
+        smtp_user="box@example.com",
+        smtp_password="app-password",
+        smtp_from="",
+    )
+    data.update(overrides)
+    return data
+
+
+def test_settings_saves_smtp(auth_client):
+    resp = auth_client.post("/admin/settings", data=_smtp_payload(), follow_redirects=True)
     assert resp.status_code == 200
-    assert get_setting("notify_phone_numbers") == "+15551234567,+15559876543"
+    assert get_smtp_setting("smtp_user") == "box@example.com"
+    assert get_smtp_setting("smtp_password") == "app-password"
 
 
-def test_settings_rejects_invalid_recipient(auth_client):
-    data = valid_settings(notify_phone_numbers="not-a-number")
-    resp = auth_client.post("/admin/settings", data=data)
+def test_settings_rejects_private_smtp_host(auth_client):
+    resp = auth_client.post("/admin/settings", data=_smtp_payload(smtp_host="127.0.0.1"))
     assert resp.status_code == 200
-    assert b"Invalid phone number" in resp.data
-    assert get_setting("notify_phone_numbers") == ""
+    assert b"valid mail server hostname" in resp.data
+    assert get_smtp_setting("smtp_user") == ""
 
 
-def test_settings_get_prefills_recipients(auth_client):
-    admin_mod.set_setting("notify_phone_numbers", "+15551234567,+15559876543")
+def test_settings_blank_password_keeps_existing(auth_client):
+    set_smtp_setting("smtp_password", "original-secret")
+    resp = auth_client.post(
+        "/admin/settings", data=_smtp_payload(smtp_password=""), follow_redirects=True
+    )
+    assert resp.status_code == 200
+    assert get_smtp_setting("smtp_password") == "original-secret"
+
+
+def test_settings_get_does_not_prefill_password(auth_client):
+    set_smtp_setting("smtp_password", "supersecretvalue")
     resp = auth_client.get("/admin/settings")
     assert resp.status_code == 200
-    assert b"+15551234567" in resp.data
+    assert b"supersecretvalue" not in resp.data
+
+
+def test_settings_smtp_not_saved_without_key(auth_client, monkeypatch):
+    monkeypatch.setattr(Config, "SETTINGS_ENCRYPTION_KEY", None)
+    resp = auth_client.post("/admin/settings", data=_smtp_payload(), follow_redirects=True)
+    assert resp.status_code == 200
+    assert b"SETTINGS_ENCRYPTION_KEY is not configured" in resp.data
 
 
 def test_connection_shows_off_when_unconfigured(auth_client):
@@ -32,11 +61,15 @@ def test_connection_shows_off_when_unconfigured(auth_client):
 
 
 def test_connection_shows_on_with_recipients(auth_client):
-    admin_mod.set_setting("notify_phone_numbers", "+15551234567")
+    set_smtp_setting("smtp_host", "smtp.fastmail.com")
+    set_smtp_setting("smtp_user", "box@example.com")
+    set_smtp_setting("smtp_password", "app-password")
+    set_smtp_setting("smtp_from", "box@example.com")
+    upsert_contact("+15551234567", "Ryan", is_admin=True, email="ryan@example.com")
     resp = auth_client.get("/admin/connection")
     assert resp.status_code == 200
     assert b"ON" in resp.data
-    assert b"\xe2\x80\xa64567" in resp.data  # masked "…4567"
+    assert b"@example.com" in resp.data
 
 
 def test_notify_test_requires_auth(client):
@@ -55,18 +88,17 @@ def test_notify_test_requires_csrf(make_app):
 
 
 def test_notify_test_sends_with_recipients(auth_client, monkeypatch):
-    admin_mod.set_setting("notify_phone_numbers", "+15551234567")
     monkeypatch.setattr(
         admin_mod,
         "send_test_notification",
-        lambda: [{"to": "+15551234567", "status": "sent", "detail": None}],
+        lambda: [{"to": "ryan@example.com", "status": "sent", "detail": None}],
     )
     resp = auth_client.post("/admin/connection/notify-test", follow_redirects=True)
     assert resp.status_code == 200
-    assert b"Test SMS sent to 1 recipient" in resp.data
+    assert b"Test email sent to 1 recipient" in resp.data
 
 
 def test_notify_test_flashes_when_unconfigured(auth_client):
     resp = auth_client.post("/admin/connection/notify-test", follow_redirects=True)
     assert resp.status_code == 200
-    assert b"No SMS recipients configured" in resp.data
+    assert b"No email recipients configured" in resp.data

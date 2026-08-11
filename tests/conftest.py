@@ -20,6 +20,10 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test-secret-key")
 os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "s3cret-pass")
 
+from cryptography.fernet import Fernet  # noqa: E402
+
+os.environ.setdefault("SETTINGS_ENCRYPTION_KEY", Fernet.generate_key().decode())
+
 import pytest  # noqa: E402
 from twilio.request_validator import RequestValidator  # noqa: E402
 
